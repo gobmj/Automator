@@ -31,16 +31,10 @@ pipeline {
     
     stages {
         stage('Checkout') {
-            when {
-                branch 'master'
-            }
             steps {
                 script {
                     echo "=== Stage: Checkout ==="
                     echo "Checking out code from repository..."
-                    
-                    // Checkout with full history for git diff
-                    checkout scm
                     
                     // Get commit information
                     env.GIT_COMMIT_MSG = sh(
@@ -60,9 +54,6 @@ pipeline {
         }
         
         stage('Detect Changes') {
-            when {
-                branch 'master'
-            }
             steps {
                 script {
                     echo "=== Stage: Detect Changes ==="
@@ -95,7 +86,6 @@ pipeline {
         
         stage('Setup Environment') {
             when {
-                branch 'master'
                 expression { env.SKIP_TEST_GENERATION != 'true' }
             }
             steps {
@@ -119,7 +109,6 @@ pipeline {
         
         stage('Install Dependencies') {
             when {
-                branch 'master'
                 expression { env.SKIP_TEST_GENERATION != 'true' }
             }
             parallel {
@@ -153,7 +142,6 @@ pipeline {
         
         stage('Generate Tests') {
             when {
-                branch 'master'
                 expression { env.SKIP_TEST_GENERATION != 'true' }
             }
             steps {
@@ -184,9 +172,6 @@ pipeline {
         }
         
         stage('Run Unit Tests') {
-            when {
-                branch 'master'
-            }
             parallel {
                 stage('Backend Unit Tests') {
                     steps {
@@ -209,7 +194,6 @@ pipeline {
         
         stage('Execute Generated Tests') {
             when {
-                branch 'master'
                 expression { env.SKIP_TEST_GENERATION != 'true' }
             }
             steps {
@@ -244,9 +228,6 @@ pipeline {
         }
         
         stage('Validate & Report') {
-            when {
-                branch 'master'
-            }
             steps {
                 script {
                     echo "=== Stage: Validate & Report ==="
@@ -283,9 +264,6 @@ pipeline {
         }
         
         stage('Archive Artifacts') {
-            when {
-                branch 'master'
-            }
             steps {
                 script {
                     echo "=== Stage: Archive Artifacts ==="
