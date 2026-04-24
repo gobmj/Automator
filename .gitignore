@@ -1,30 +1,42 @@
-# Dependencies
+# Node modules
 node_modules/
 */node_modules/
 
-# Environment variables
+# Environment files
 .env
 .env.local
 .env.*.local
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Testing
-coverage/
-*.lcov
-.nyc_output
-
 # Build outputs
 dist/
 build/
-*.tsbuildinfo
+*/dist/
+*/build/
+
+# Test outputs
+coverage/
+*/coverage/
+.nyc_output/
+*/.nyc_output/
+
+# Playwright
+playwright-tests/test-results/
+playwright-tests/playwright-report/
+playwright-tests/generated/*.spec.js
+playwright-tests/.cache/
+
+# Reports
+reports/
+*.log
+
+# Jenkins
+jenkins_home/
+.jenkins/
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
 
 # IDE
 .vscode/
@@ -34,26 +46,21 @@ build/
 *~
 .DS_Store
 
-# Database
-*.sqlite
-*.db
-backend/*.sqlite
-backend/*.db
-backend/database.sqlite
+# Sensitive configuration files
+jenkins/config/ai-config.json
+jenkins/config/webhook-config.json
+jenkins/config/.env
 
-# Docker
-docker-compose.override.yml
+# Keep template/example files
+!jenkins/config/ai-config.json.template
+!jenkins/config/.env.example
 
-# Playwright
-playwright-report/
-test-results/
-playwright/.cache/
-*.trace.zip
-
-# OS specific
+# OS
 Thumbs.db
+.DS_Store
 
-# Misc
-.cache/
-.temp/
-.tmp/
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/

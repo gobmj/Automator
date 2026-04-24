@@ -1,0 +1,37 @@
+# Required Jenkins Plugins for AI-Driven CI/CD Pipeline
+# Install these plugins after completing Jenkins initial setup
+
+# Core plugins
+workflow-aggregator:latest
+pipeline-stage-view:latest
+git:latest
+github:latest
+github-branch-source:latest
+
+# GitHub integration
+github-api:latest
+github-oauth:latest
+plain-credentials:latest
+credentials:latest
+credentials-binding:latest
+
+# Build and test plugins
+nodejs:latest
+docker-workflow:latest
+docker-plugin:latest
+
+# Reporting and visualization
+htmlpublisher:latest
+junit:latest
+test-results-analyzer:latest
+
+# Utility plugins
+timestamper:latest
+ws-cleanup:latest
+build-timeout:latest
+ansicolor:latest
+
+# Optional but recommended
+pipeline-utility-steps:latest
+email-ext:latest
+slack:latest
