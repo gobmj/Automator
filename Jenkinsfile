@@ -2,9 +2,6 @@ pipeline {
     agent any
     
     environment {
-        // AI Core Configuration
-        AI_CONFIG_FILE = 'jenkins/config/ai-config.json'
-        
         // Directories
         GENERATED_TESTS_DIR = 'playwright-tests/generated'
         REPORTS_DIR = 'reports'
@@ -101,6 +98,20 @@ pipeline {
             steps {
                 script {
                     echo "=== Stage: Setup Environment ==="
+                    
+                    // Load environment variables from .env file
+                    if (fileExists('jenkins/config/.env')) {
+                        def envFile = readFile('jenkins/config/.env')
+                        envFile.split('\n').each { line ->
+                            if (line && !line.startsWith('#') && line.contains('=')) {
+                                def (key, value) = line.split('=', 2)
+                                env."${key.trim()}" = value.trim()
+                            }
+                        }
+                        echo "✓ Environment variables loaded from .env"
+                    } else {
+                        echo "⚠ Warning: jenkins/config/.env not found"
+                    }
                     
                     // Make setup script executable
                     sh 'chmod +x jenkins/scripts/setup-env.sh'

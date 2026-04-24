@@ -10,37 +10,36 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-// Configuration
-const CONFIG_FILE = process.env.AI_CONFIG_FILE || 'jenkins/config/ai-config.json';
+// Configuration from environment variables
 const CHANGED_FILES = process.env.CHANGED_FILES || '';
 const GENERATED_TESTS_DIR = process.env.GENERATED_TESTS_DIR || 'playwright-tests/generated';
 
-// Load AI configuration
+// Load AI configuration from environment variables
 function loadConfig() {
-    try {
-        const configPath = path.resolve(CONFIG_FILE);
-        if (!fs.existsSync(configPath)) {
-            console.error(`Configuration file not found: ${configPath}`);
-            console.error('Please create the configuration file with AI Core credentials');
-            process.exit(1);
-        }
-        
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        
-        // Validate required fields
-        const required = ['clientId', 'clientSecret', 'authUrl', 'baseUrl', 'deploymentUrl'];
-        for (const field of required) {
-            if (!config[field]) {
-                console.error(`Missing required field in config: ${field}`);
-                process.exit(1);
-            }
-        }
-        
-        return config;
-    } catch (error) {
-        console.error('Error loading configuration:', error.message);
+    const config = {
+        clientId: process.env.AI_CORE_CLIENT_ID,
+        clientSecret: process.env.AI_CORE_CLIENT_SECRET,
+        authUrl: process.env.AI_CORE_AUTH_URL,
+        baseUrl: process.env.AI_CORE_BASE_URL,
+        deploymentUrl: process.env.AI_CORE_DEPLOYMENT_URL,
+        resourceGroup: process.env.AI_CORE_RESOURCE_GROUP || 'default'
+    };
+    
+    // Validate required fields
+    const required = ['clientId', 'clientSecret', 'authUrl', 'baseUrl', 'deploymentUrl'];
+    const missing = required.filter(field => !config[field]);
+    
+    if (missing.length > 0) {
+        console.error('Missing required environment variables:');
+        missing.forEach(field => {
+            const envVar = 'AI_CORE_' + field.replace(/([A-Z])/g, '_$1').toUpperCase();
+            console.error(`  - ${envVar}`);
+        });
+        console.error('\nPlease set these variables in jenkins/config/.env');
         process.exit(1);
     }
+    
+    return config;
 }
 
 // Get OAuth token from SAP AI Core
@@ -113,10 +112,31 @@ function analyzeFile(filePath, content) {
     };
 }
 
-// Generate test using AI
-async function generateTestWithAI(fileAnalysis, config, accessToken) {
+// Generate test using AI with retry logic
+async function generateTestWithAI(fileAnalysis, config, accessToken, retries = 3) {
     const prompt = createPrompt(fileAnalysis);
     
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const testCode = await makeAIRequest(prompt, config, accessToken);
+            return testCode;
+        } catch (error) {
+            console.log(`  Attempt ${attempt}/${retries} failed: ${error.message}`);
+            
+            if (attempt === retries) {
+                throw new Error(`Failed after ${retries} attempts: ${error.message}`);
+            }
+            
+            // Wait before retry (exponential backoff)
+            const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+            console.log(`  Retrying in ${waitTime}ms...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+    }
+}
+
+// Make AI request
+function makeAIRequest(prompt, config, accessToken) {
     return new Promise((resolve, reject) => {
         const requestData = JSON.stringify({
             messages: [
@@ -143,7 +163,8 @@ async function generateTestWithAI(fileAnalysis, config, accessToken) {
                 'Content-Type': 'application/json',
                 'Content-Length': requestData.length,
                 'AI-Resource-Group': config.resourceGroup || 'default'
-            }
+            },
+            timeout: 30000 // 30 second timeout
         };
         
         const req = https.request(options, (res) => {
@@ -155,16 +176,42 @@ async function generateTestWithAI(fileAnalysis, config, accessToken) {
             
             res.on('end', () => {
                 try {
+                    if (res.statusCode !== 200) {
+                        reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+                        return;
+                    }
+                    
                     const response = JSON.parse(data);
+                    
+                    // Check for API errors
+                    if (response.error) {
+                        reject(new Error(`API Error: ${response.error.message || JSON.stringify(response.error)}`));
+                        return;
+                    }
+                    
                     const generatedTest = extractTestCode(response);
+                    
+                    if (!generatedTest || generatedTest.length < 50) {
+                        reject(new Error('Generated test is too short or empty'));
+                        return;
+                    }
+                    
                     resolve(generatedTest);
                 } catch (error) {
-                    reject(error);
+                    reject(new Error(`Failed to parse response: ${error.message}`));
                 }
             });
         });
         
-        req.on('error', reject);
+        req.on('error', (error) => {
+            reject(new Error(`Request failed: ${error.message}`));
+        });
+        
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Request timeout after 30 seconds'));
+        });
+        
         req.write(requestData);
         req.end();
     });
@@ -174,32 +221,55 @@ async function generateTestWithAI(fileAnalysis, config, accessToken) {
 function createPrompt(fileAnalysis) {
     const { filePath, testType, content, isAPI, isComponent } = fileAnalysis;
     
-    let prompt = `Generate Playwright test cases for the following ${testType} code from ${filePath}:\n\n`;
-    prompt += `\`\`\`javascript\n${content}\n\`\`\`\n\n`;
+    let prompt = `You are an expert test automation engineer. Generate comprehensive Playwright test cases for the following ${testType} code from ${filePath}.\n\n`;
+    prompt += `CODE TO TEST:\n\`\`\`javascript\n${content}\n\`\`\`\n\n`;
     
     if (isAPI) {
-        prompt += `Generate API tests that:\n`;
-        prompt += `1. Test all endpoints and methods\n`;
-        prompt += `2. Validate request/response formats\n`;
-        prompt += `3. Test error handling and edge cases\n`;
-        prompt += `4. Check status codes and response data\n`;
-        prompt += `5. Use Playwright's request context for API testing\n\n`;
+        prompt += `REQUIREMENTS - Generate API tests that:\n`;
+        prompt += `1. Test all HTTP endpoints and methods (GET, POST, PUT, DELETE, etc.)\n`;
+        prompt += `2. Validate request/response formats and data structures\n`;
+        prompt += `3. Test error handling, edge cases, and boundary conditions\n`;
+        prompt += `4. Verify HTTP status codes (200, 201, 400, 404, 500, etc.)\n`;
+        prompt += `5. Test authentication and authorization if applicable\n`;
+        prompt += `6. Use Playwright's request context (test.request) for API testing\n`;
+        prompt += `7. Include data validation and schema checks\n`;
+        prompt += `8. Test concurrent requests if relevant\n\n`;
     } else if (isComponent) {
-        prompt += `Generate UI tests that:\n`;
-        prompt += `1. Test component rendering\n`;
-        prompt += `2. Test user interactions (clicks, inputs, etc.)\n`;
-        prompt += `3. Validate UI state changes\n`;
-        prompt += `4. Test accessibility\n`;
-        prompt += `5. Use Playwright's page object model\n\n`;
+        prompt += `REQUIREMENTS - Generate UI/Component tests that:\n`;
+        prompt += `1. Test initial component rendering and DOM structure\n`;
+        prompt += `2. Test all user interactions (clicks, inputs, form submissions, etc.)\n`;
+        prompt += `3. Validate UI state changes and dynamic content updates\n`;
+        prompt += `4. Test error states and loading states\n`;
+        prompt += `5. Verify accessibility (ARIA labels, keyboard navigation, etc.)\n`;
+        prompt += `6. Test responsive behavior if applicable\n`;
+        prompt += `7. Use Playwright's page object model and locators\n`;
+        prompt += `8. Include visual regression checks where appropriate\n\n`;
+    } else {
+        prompt += `REQUIREMENTS - Generate comprehensive tests that:\n`;
+        prompt += `1. Cover all major functions and methods\n`;
+        prompt += `2. Test both success and failure scenarios\n`;
+        prompt += `3. Validate input/output behavior\n`;
+        prompt += `4. Test edge cases and boundary conditions\n`;
+        prompt += `5. Include integration test scenarios\n\n`;
     }
     
-    prompt += `Requirements:\n`;
-    prompt += `- Use Playwright test syntax\n`;
-    prompt += `- Include proper test descriptions\n`;
-    prompt += `- Add assertions for all critical paths\n`;
-    prompt += `- Handle async operations properly\n`;
-    prompt += `- Include setup and teardown if needed\n`;
-    prompt += `- Return ONLY the test code, no explanations\n`;
+    prompt += `TECHNICAL REQUIREMENTS:\n`;
+    prompt += `- Use Playwright test syntax: import { test, expect } from '@playwright/test'\n`;
+    prompt += `- Use descriptive test names that explain what is being tested\n`;
+    prompt += `- Group related tests using test.describe() blocks\n`;
+    prompt += `- Add comprehensive assertions using expect() for all critical paths\n`;
+    prompt += `- Handle async operations properly with await\n`;
+    prompt += `- Include beforeEach/afterEach hooks for setup and teardown if needed\n`;
+    prompt += `- Use proper error handling and try-catch where appropriate\n`;
+    prompt += `- Add comments for complex test logic\n`;
+    prompt += `- Follow best practices for test isolation and independence\n\n`;
+    
+    prompt += `OUTPUT FORMAT:\n`;
+    prompt += `- Return ONLY valid JavaScript/Playwright test code\n`;
+    prompt += `- Do NOT include explanations, markdown formatting, or commentary\n`;
+    prompt += `- Do NOT wrap the code in markdown code blocks\n`;
+    prompt += `- Start directly with the import statement\n`;
+    prompt += `- Ensure the code is production-ready and can be executed immediately\n`;
     
     return prompt;
 }
