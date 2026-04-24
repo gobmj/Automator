@@ -2,6 +2,20 @@ pipeline {
     agent any
     
     environment {
+        // AI Core credentials from Jenkins Credentials
+        AI_CORE_CLIENT_ID = credentials('ai-core-client-id')
+        AI_CORE_CLIENT_SECRET = credentials('ai-core-client-secret')
+        AI_CORE_DEPLOYMENT_URL = credentials('ai-core-deployment-url')
+        GITHUB_TOKEN = credentials('github-token')
+        
+        // AI Core static configuration
+        AI_CORE_AUTH_URL = 'https://dm-canary.authentication.sap.hana.ondemand.com/oauth/token'
+        AI_CORE_BASE_URL = 'https://api.ai.internalprod.eu-central-1.aws.ml.hana.ondemand.com'
+        AI_CORE_RESOURCE_GROUP = 'default'
+        
+        // GitHub configuration
+        GITHUB_REPO = 'gobmj/Automator'
+        
         // Directories
         GENERATED_TESTS_DIR = 'playwright-tests/generated'
         REPORTS_DIR = 'reports'
@@ -98,20 +112,13 @@ pipeline {
             steps {
                 script {
                     echo "=== Stage: Setup Environment ==="
+                    echo "Using credentials from Jenkins Credentials Store"
                     
-                    // Load environment variables from .env file
-                    if (fileExists('jenkins/config/.env')) {
-                        def envFile = readFile('jenkins/config/.env')
-                        envFile.split('\n').each { line ->
-                            if (line && !line.startsWith('#') && line.contains('=')) {
-                                def (key, value) = line.split('=', 2)
-                                env."${key.trim()}" = value.trim()
-                            }
-                        }
-                        echo "✓ Environment variables loaded from .env"
-                    } else {
-                        echo "⚠ Warning: jenkins/config/.env not found"
-                    }
+                    // Verify credentials are loaded
+                    echo "✓ AI_CORE_CLIENT_ID: ${env.AI_CORE_CLIENT_ID ? 'Set' : 'Missing'}"
+                    echo "✓ AI_CORE_CLIENT_SECRET: ${env.AI_CORE_CLIENT_SECRET ? 'Set' : 'Missing'}"
+                    echo "✓ AI_CORE_DEPLOYMENT_URL: ${env.AI_CORE_DEPLOYMENT_URL ? 'Set' : 'Missing'}"
+                    echo "✓ GITHUB_TOKEN: ${env.GITHUB_TOKEN ? 'Set' : 'Missing'}"
                     
                     // Make setup script executable
                     sh 'chmod +x jenkins/scripts/setup-env.sh'
