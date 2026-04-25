@@ -2,12 +2,22 @@ import { jest } from '@jest/globals';
 import * as orderService from '../../../src/services/orderService.js';
 import Order from '../../../src/models/Order.js';
 
-// Mock the Order model
+// Mock the Order model to prevent database connections.
+// jest.mock() auto-mock doesn't reliably replace inherited Sequelize static methods
+// with jest.fn(), so we assign them explicitly in beforeEach.
 jest.mock('../../../src/models/Order.js');
 
 describe('Order Service - Statistics', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    // Assign fresh jest mock functions for every Sequelize static method used
+    // by getOrderStatistics(). Also mock Order.sequelize.fn/col which are
+    // called when building aggregate query attributes before findAll/findOne.
+    Order.count = jest.fn();
+    Order.findAll = jest.fn();
+    Order.findOne = jest.fn();
+    if (!Order.sequelize) Order.sequelize = {};
+    Order.sequelize.fn = jest.fn((name, col) => `${name}(${col})`);
+    Order.sequelize.col = jest.fn((col) => col);
   });
 
   describe('getOrderStatistics', () => {

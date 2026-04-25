@@ -1,8 +1,8 @@
 // Auto-generated step definitions for Order Management System
 // Generated on: 2026-04-25T17:55:43.000Z
 
-import { Given, When, Then, Before, After } from '@cucumber/cucumber';
-import { expect } from '@playwright/test';
+import { Given, When, Then, After } from '@cucumber/cucumber';
+import { expect, request as playwrightRequest } from '@playwright/test';
 
 // Global state for test context
 let apiContext;
@@ -16,7 +16,7 @@ let testOrderId;
 Given('the Order Management API is available at {string}', async function(url) {
   baseURL = url;
   // Initialize API context
-  apiContext = await this.request.newContext({
+  apiContext = await playwrightRequest.newContext({
     baseURL: baseURL,
     extraHTTPHeaders: {
       'Content-Type': 'application/json'
@@ -110,7 +110,7 @@ Given('there are orders for plant {string}', async function(plant) {
   testOrderId = data.data?.orderId;
 });
 
-Given('an order exists with ID {string}', async function(orderId) {
+Given('an order exists with ID {string}', async function(_orderId) {
   // Create a test order and store its ID
   const testOrder = {
     orderNumber: `TEST-${Date.now()}`,
@@ -146,7 +146,7 @@ Given('an order exists with status {string}', async function(status) {
   testOrderId = data.data?.orderId;
 });
 
-Given('the order ID is {string}', async function(orderId) {
+Given('the order ID is {string}', async function(_orderId) {
   // Use the previously created order ID
   // testOrderId is already set from previous step
 });
@@ -251,7 +251,7 @@ Then('the response should contain an error message', async function() {
   expect(responseData.error).toBeTruthy();
 });
 
-Then('the response should contain validation error for {string}', async function(field) {
+Then('the response should contain validation error for {string}', async function(_field) {
   expect(responseData.success).toBe(false);
   expect(responseData.error).toBeTruthy();
 });
@@ -290,7 +290,7 @@ Then('the response should contain the order details', async function() {
   expect(responseData.data).toHaveProperty('material');
 });
 
-Then('the order ID should be {string}', async function(orderId) {
+Then('the order ID should be {string}', async function(_orderId) {
   // The actual order ID will be different, just verify it exists
   expect(responseData.data.orderId).toBeTruthy();
 });
@@ -356,7 +356,7 @@ Then('the system should enforce the status workflow', async function() {
   expect(responseData.success).toBe(false);
 });
 
-Then('the order should transition through {string} first', async function(intermediateStatus) {
+Then('the order should transition through {string} first', async function(_intermediateStatus) {
   // This is a business rule validation
   // The error message should indicate the required workflow
   expect(responseData.error).toBeTruthy();
