@@ -5,7 +5,7 @@ import { Op } from 'sequelize';
 /**
  * Order Service
  * Handles business logic for order management
- * Updated to trigger AI test generation
+ * Testing AI-powered test generation with Anthropic Claude
  */
 
 /**
