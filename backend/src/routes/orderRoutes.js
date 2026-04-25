@@ -17,6 +17,9 @@ const router = express.Router();
 // Get statistics (must be before /:orderId to avoid conflict)
 router.get('/statistics', orderController.getOrderStatistics);
 
+// Bulk update order statuses (must be before /:orderId to avoid conflict)
+router.put('/bulk/status', orderController.bulkUpdateStatus);
+
 // Search orders (must be before /:orderId to avoid conflict)
 router.get('/search', orderController.searchOrders);
 

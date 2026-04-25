@@ -163,6 +163,45 @@ export const searchOrders = async (searchTerm) => {
 };
 
 /**
+ * Bulk update the status of multiple orders
+ * @param {string[]} orderIds - Array of order IDs
+ * @param {string} status - Target status
+ * @returns {Promise<Object>} Summary of updated and failed orders
+ */
+export const bulkUpdateStatus = async (orderIds, status) => {
+  const results = { updated: [], failed: [] };
+
+  for (const orderId of orderIds) {
+    try {
+      const order = await getOrderById(orderId);
+
+      const validTransitions = {
+        CREATED:     ['RELEASABLE'],
+        RELEASABLE:  ['RELEASED', 'CREATED'],
+        RELEASED:    ['IN_PROGRESS', 'RELEASABLE'],
+        IN_PROGRESS: ['COMPLETED', 'RELEASED'],
+        COMPLETED:   [],
+      };
+
+      if (!validTransitions[order.status]?.includes(status)) {
+        results.failed.push({
+          orderId,
+          reason: `Cannot transition from ${order.status} to ${status}`,
+        });
+        continue;
+      }
+
+      await order.update({ status });
+      results.updated.push(orderId);
+    } catch (error) {
+      results.failed.push({ orderId, reason: error.message });
+    }
+  }
+
+  return results;
+};
+
+/**
  * Get order statistics
  * @returns {Promise<Object>} Order statistics
  */
