@@ -138,8 +138,19 @@ async function generateTestWithAI(fileAnalysis, config, accessToken, retries = 3
 // Make AI request
 function makeAIRequest(prompt, config, accessToken) {
     return new Promise((resolve, reject) => {
-        // Detect if using Anthropic model based on deployment URL
-        const isAnthropic = config.deploymentUrl.includes('anthropic') || config.deploymentUrl.includes('claude');
+        // Detect if using Anthropic model based on deployment URL or check if URL ends with /chat/completions
+        // If URL already has /chat/completions, it's likely an Anthropic model deployed with OpenAI-compatible endpoint
+        // We need to remove it and use the base deployment URL
+        let deploymentUrl = config.deploymentUrl;
+        let isAnthropic = false;
+        
+        // Check if this is an Anthropic model by looking at the URL pattern
+        if (deploymentUrl.includes('/chat/completions')) {
+            // This is likely an Anthropic model with OpenAI-compatible endpoint
+            // Remove /chat/completions and use base URL for Anthropic format
+            deploymentUrl = deploymentUrl.replace('/chat/completions', '');
+            isAnthropic = true;
+        }
         
         let requestData;
         if (isAnthropic) {
@@ -173,7 +184,7 @@ function makeAIRequest(prompt, config, accessToken) {
             });
         }
         
-        const url = new URL(config.deploymentUrl);
+        const url = new URL(deploymentUrl);
         const options = {
             hostname: url.hostname,
             path: url.pathname,
