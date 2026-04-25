@@ -182,7 +182,20 @@ export const searchOrders = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-};// Test comment
-// Test Jenkins credentials
-// Test webhook trigger - Fri Apr 24 17:25:50 IST 2026
-// Second webhook test - Fri Apr 24 17:27:12 IST 2026
+};
+
+/**
+ * Get order statistics
+ * GET /api/orders/statistics
+ */
+export const getOrderStatistics = async (req, res, next) => {
+  try {
+    const statistics = await orderService.getOrderStatistics();
+    res.status(200).json({
+      success: true,
+      data: statistics,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

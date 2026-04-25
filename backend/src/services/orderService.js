@@ -159,4 +159,75 @@ export const searchOrders = async (searchTerm) => {
   });
   
   return orders;
-};// Trigger test generation - Fri Apr 24 17:32:35 IST 2026
+};
+
+/**
+ * Get order statistics
+ * @returns {Promise<Object>} Order statistics
+ */
+export const getOrderStatistics = async () => {
+  // Get total count
+  const totalOrders = await Order.count();
+  
+  // Get count by status
+  const statusCounts = await Order.findAll({
+    attributes: [
+      'status',
+      [Order.sequelize.fn('COUNT', Order.sequelize.col('status')), 'count']
+    ],
+    group: ['status'],
+    raw: true,
+  });
+  
+  // Get count by plant
+  const plantCounts = await Order.findAll({
+    attributes: [
+      'plant',
+      [Order.sequelize.fn('COUNT', Order.sequelize.col('plant')), 'count']
+    ],
+    group: ['plant'],
+    raw: true,
+  });
+  
+  // Get average priority
+  const avgPriorityResult = await Order.findOne({
+    attributes: [
+      [Order.sequelize.fn('AVG', Order.sequelize.col('priority')), 'avgPriority']
+    ],
+    raw: true,
+  });
+  
+  // Get orders created in last 7 days
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  const recentOrdersCount = await Order.count({
+    where: {
+      createdDate: {
+        [Op.gte]: sevenDaysAgo,
+      },
+    },
+  });
+  
+  // Format status counts as object
+  const statusBreakdown = {};
+  statusCounts.forEach(item => {
+    statusBreakdown[item.status] = parseInt(item.count);
+  });
+  
+  // Format plant counts as object
+  const plantBreakdown = {};
+  plantCounts.forEach(item => {
+    plantBreakdown[item.plant] = parseInt(item.count);
+  });
+  
+  return {
+    totalOrders,
+    statusBreakdown,
+    plantBreakdown,
+    averagePriority: avgPriorityResult?.avgPriority ? parseFloat(avgPriorityResult.avgPriority).toFixed(2) : 0,
+    recentOrders: {
+      last7Days: recentOrdersCount,
+    },
+  };
+};

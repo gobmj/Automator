@@ -14,6 +14,9 @@ const router = express.Router();
  * Order Routes
  */
 
+// Get statistics (must be before /:orderId to avoid conflict)
+router.get('/statistics', orderController.getOrderStatistics);
+
 // Search orders (must be before /:orderId to avoid conflict)
 router.get('/search', orderController.searchOrders);
 
