@@ -20,6 +20,9 @@ router.get('/statistics', orderController.getOrderStatistics);
 // Bulk update order statuses (must be before /:orderId to avoid conflict)
 router.put('/bulk/status', orderController.bulkUpdateStatus);
 
+// Escalate order priority
+router.patch('/:orderId/priority', validateOrderId, orderController.escalateOrderPriority);
+
 // Search orders (must be before /:orderId to avoid conflict)
 router.get('/search', orderController.searchOrders);
 

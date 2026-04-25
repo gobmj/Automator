@@ -163,6 +163,27 @@ export const searchOrders = async (searchTerm) => {
 };
 
 /**
+ * Escalate order priority
+ * @param {string} orderId - Order ID
+ * @param {number} newPriority - New priority (must be higher than current, 1-1000)
+ * @returns {Promise<Object>} Updated order
+ */
+export const escalateOrderPriority = async (orderId, newPriority) => {
+  const order = await getOrderById(orderId);
+
+  if (newPriority <= order.priority) {
+    throw new Error(`New priority ${newPriority} must be higher than current priority ${order.priority}`);
+  }
+
+  if (newPriority < 1 || newPriority > 1000) {
+    throw new Error('Priority must be between 1 and 1000');
+  }
+
+  await order.update({ priority: newPriority });
+  return order;
+};
+
+/**
  * Bulk update the status of multiple orders
  * @param {string[]} orderIds - Array of order IDs
  * @param {string} status - Target status

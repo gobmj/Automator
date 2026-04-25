@@ -233,3 +233,43 @@ export const getOrderStatistics = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Escalate order priority
+ * PATCH /api/orders/:orderId/priority
+ */
+export const escalateOrderPriority = async (req, res, next) => {
+  try {
+    const { priority } = req.body;
+
+    if (priority === undefined || priority === null) {
+      return res.status(400).json({
+        success: false,
+        error: 'priority is required',
+      });
+    }
+
+    const parsed = parseInt(priority, 10);
+    if (isNaN(parsed)) {
+      return res.status(400).json({
+        success: false,
+        error: 'priority must be a number',
+      });
+    }
+
+    const order = await orderService.escalateOrderPriority(req.params.orderId, parsed);
+    res.status(200).json({
+      success: true,
+      message: `Order priority escalated to ${parsed}`,
+      data: order,
+    });
+  } catch (error) {
+    if (error.message === 'Order not found') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    if (error.message.startsWith('New priority') || error.message.startsWith('Priority must')) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
