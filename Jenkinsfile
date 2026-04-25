@@ -12,6 +12,7 @@ pipeline {
         AI_CORE_AUTH_URL = 'https://dm-canary.authentication.sap.hana.ondemand.com/oauth/token'
         AI_CORE_BASE_URL = 'https://api.ai.internalprod.eu-central-1.aws.ml.hana.ondemand.com'
         AI_CORE_RESOURCE_GROUP = 'default'
+        AI_CORE_MODEL_PROVIDER = 'anthropic'
         
         // GitHub configuration
         GITHUB_REPO = 'gobmj/Automator'
@@ -198,7 +199,7 @@ pipeline {
                     steps {
                         dir('backend') {
                             echo "Running backend unit tests..."
-                            sh 'npm test -- --coverage --json --outputFile=../reports/backend-unit-tests.json || true'
+                            sh 'npm test -- --testPathPattern=tests/unit --coverage --json --outputFile=../reports/backend-unit-tests.json || true'
                         }
                     }
                 }

@@ -138,25 +138,44 @@ async function generateTestWithAI(fileAnalysis, config, accessToken, retries = 3
 // Make AI request
 function makeAIRequest(prompt, config, accessToken) {
     return new Promise((resolve, reject) => {
-        // Use deployment URL as-is - SAP AI Core provides OpenAI-compatible wrapper for all models
-        const deploymentUrl = config.deploymentUrl;
-        
-        // Use OpenAI format - SAP AI Core handles the translation to native model format
-        const requestData = JSON.stringify({
-            messages: [
-                {
-                    role: 'system',
-                    content: 'You are an expert test automation engineer. Generate comprehensive Playwright test cases for the provided code. Return only valid JavaScript code for Playwright tests, no explanations.'
-                },
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            max_tokens: 2000,
-            temperature: 0.3
-        });
-        
+        // Determine model provider: 'anthropic' uses /invoke + native format; others use /chat/completions + OpenAI format
+        const modelProvider = (process.env.AI_CORE_MODEL_PROVIDER || 'openai').toLowerCase();
+        const isAnthropic = modelProvider === 'anthropic';
+
+        // Normalize deployment URL: strip any existing subpath, then append the correct one
+        let deploymentUrl = config.deploymentUrl.replace(/\/(chat\/completions|invoke)\/?$/, '');
+        deploymentUrl += isAnthropic ? '/invoke' : '/chat/completions';
+
+        let requestData;
+        if (isAnthropic) {
+            // Native Anthropic format required by SAP AI Core Anthropic deployments
+            requestData = JSON.stringify({
+                anthropic_version: 'bedrock-2023-05-31',
+                max_tokens: 2000,
+                temperature: 0.3,
+                system: 'You are an expert test automation engineer. Generate comprehensive Playwright test cases for the provided code. Return only valid JavaScript code for Playwright tests, no explanations.',
+                messages: [
+                    { role: 'user', content: prompt }
+                ]
+            });
+        } else {
+            // OpenAI-compatible format
+            requestData = JSON.stringify({
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are an expert test automation engineer. Generate comprehensive Playwright test cases for the provided code. Return only valid JavaScript code for Playwright tests, no explanations.'
+                    },
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                max_tokens: 2000,
+                temperature: 0.3
+            });
+        }
+
         const url = new URL(deploymentUrl);
         const options = {
             hostname: url.hostname,
