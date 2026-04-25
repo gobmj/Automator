@@ -82,7 +82,7 @@ Total Stages: 9 | Estimated Duration: 5-10 minutes
             }
         }
         
-        stage('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━') {
+        stage('🚀 Phase 1: Initialization & Analysis') {
             steps {
                 script {
                     echo """
@@ -202,7 +202,7 @@ Progress: [████████░░░░░░░░░░░░] 33% - P
             }
         }
         
-        stage('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━') {
+        stage('🤖 Phase 2: AI Test Generation') {
             when {
                 expression { env.SKIP_TEST_GENERATION != 'true' }
             }
@@ -360,7 +360,7 @@ Progress: [████████████████░░░░] 66% - P
             }
         }
         
-        stage('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━') {
+        stage('✅ Phase 3: Validation & Reporting') {
             when {
                 expression { env.SKIP_TEST_GENERATION != 'true' }
             }
