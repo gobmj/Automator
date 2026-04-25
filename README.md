@@ -363,3 +363,7 @@ MIT License - This project is for educational purposes.
 **Developed by:** Govind M J 
 **Institution:** BITS Pilani  
 **Project:** BITS Dissertation - AI-Driven Test Automation Using Playwright
+
+---
+
+*Last updated: April 25, 2026 - Test branch update*
