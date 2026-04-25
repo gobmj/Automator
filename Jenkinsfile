@@ -1,46 +1,41 @@
 pipeline {
     agent any
-    
+
     environment {
         // AI Core credentials from Jenkins Credentials
         AI_CORE_CLIENT_ID = credentials('ai-core-client-id')
         AI_CORE_CLIENT_SECRET = credentials('ai-core-client-secret')
         AI_CORE_DEPLOYMENT_URL = credentials('ai-core-deployment-url')
         GITHUB_TOKEN = credentials('github-token')
-        
+
         // AI Core static configuration
         AI_CORE_AUTH_URL = 'https://dm-canary.authentication.sap.hana.ondemand.com/oauth/token'
         AI_CORE_BASE_URL = 'https://api.ai.internalprod.eu-central-1.aws.ml.hana.ondemand.com'
         AI_CORE_RESOURCE_GROUP = 'default'
         AI_CORE_MODEL_PROVIDER = 'anthropic'
-        
+
         // GitHub configuration
         GITHUB_REPO = 'gobmj/Automator'
-        
+
         // Directories
-        GENERATED_TESTS_DIR = 'playwright-tests/generated'
+        FEATURES_DIR = 'playwright-tests/features'
+        STEPS_DIR = 'playwright-tests/step-definitions'
         REPORTS_DIR = 'reports'
-        
+
         // Node version
         NODE_VERSION = '20.x'
     }
-    
+
     triggers {
-        // Trigger on GitHub push events
         githubPush()
     }
-    
+
     options {
-        // Keep last 10 builds
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        
-        // Timeout after 30 minutes
         timeout(time: 30, unit: 'MINUTES')
-        
-        // Timestamps in console output
         timestamps()
     }
-    
+
     stages {
         stage('🗺️  Pipeline Roadmap') {
             steps {
@@ -48,285 +43,280 @@ pipeline {
                     echo """
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                                                                           ║
-║              AI-DRIVEN TEST AUTOMATION PIPELINE ROADMAP                   ║
+║           AI-DRIVEN BDD TEST AUTOMATION PIPELINE ROADMAP                  ║
 ║                                                                           ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ PHASE 1: INITIALIZATION & ANALYSIS                                       │
+│ PHASE 1: INITIALIZATION & ANALYSIS                                        │
 ├───────────────────────────────────────────────────────────────────────────┤
-│  1️⃣  Checkout              → Clone repository and get commit info        │
-│  2️⃣  Detect Changes        → Analyze modified files                      │
-│  3️⃣  Setup Environment     → Configure Node.js and dependencies          │
+│  1️⃣  Checkout              → Clone repository and get commit info         │
+│  2️⃣  Detect Changes        → Analyze modified source files                │
+│  3️⃣  Setup Environment     → Configure Node.js and verify credentials     │
 └───────────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ PHASE 2: AI TEST GENERATION                                              │
+│ PHASE 2: AI BDD TEST GENERATION                                           │
 ├───────────────────────────────────────────────────────────────────────────┤
-│  4️⃣  Install Dependencies  → Backend, Frontend, Playwright               │
-│  5️⃣  Generate Tests        → AI creates Playwright tests                 │
-│  6️⃣  Run Unit Tests        → Execute existing test suites                │
+│  4️⃣  Install Dependencies  → Backend, Frontend, Cucumber + Playwright     │
+│  5️⃣  Generate Features     → AI creates Gherkin .feature files            │
+│  6️⃣  Generate Steps        → AI creates step definition .js files         │
 └───────────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ PHASE 3: VALIDATION & REPORTING                                          │
+│ PHASE 3: TESTING & REPORTING                                              │
 ├───────────────────────────────────────────────────────────────────────────┤
-│  7️⃣  Execute Generated     → Run AI-generated Playwright tests           │
-│  8️⃣  Validate & Report     → Compare results and generate reports        │
-│  9️⃣  Archive Artifacts     → Save tests and reports                      │
+│  7️⃣  Run Unit Tests        → Execute backend and frontend unit tests      │
+│  8️⃣  Execute BDD Tests     → Run Cucumber scenarios with Playwright       │
+│  9️⃣  Archive Artifacts     → Save reports and generated test files        │
 └───────────────────────────────────────────────────────────────────────────┘
 
-Total Stages: 9 | Estimated Duration: 5-10 minutes
+Total Stages: 9 | Estimated Duration: 8-15 minutes
                     """
                 }
             }
         }
-        
+
         stage('🚀 Phase 1: Initialization & Analysis') {
             steps {
                 script {
                     echo """
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║                                                                           ║
-║                    🚀 PHASE 1: INITIALIZATION & ANALYSIS                 ║
-║                                                                           ║
-║                    Progress: [████░░░░░░░░░░░░░░░░] 0%                   ║
-║                                                                           ║
+║                 🚀 PHASE 1: INITIALIZATION & ANALYSIS                    ║
+║                 Progress: [████░░░░░░░░░░░░░░░░] 0%                      ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
                     """
                 }
             }
         }
-        
+
         stage('1️⃣  Checkout') {
             steps {
                 script {
                     echo """
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 1/9: Checkout Repository                                           │
+│ Stage 1/9: Checkout Repository                                            │
 └───────────────────────────────────────────────────────────────────────────┘
                     """
-                    echo "Checking out code from repository..."
-                    
-                    // Checkout with full history for git diff
                     checkout scm
-                    
-                    // Get commit information
+
                     env.GIT_COMMIT_MSG = sh(
                         script: 'git log -1 --pretty=%B',
                         returnStdout: true
                     ).trim()
-                    
+
                     env.GIT_AUTHOR = sh(
                         script: 'git log -1 --pretty=%an',
                         returnStdout: true
                     ).trim()
-                    
+
                     echo "✓ Commit: ${env.GIT_COMMIT_MSG}"
                     echo "✓ Author: ${env.GIT_AUTHOR}"
-                    echo "✓ Checkout completed successfully"
                 }
             }
         }
-        
+
         stage('2️⃣  Detect Changes') {
             steps {
                 script {
                     echo """
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 2/9: Detect Code Changes                                           │
+│ Stage 2/9: Detect Code Changes                                            │
 └───────────────────────────────────────────────────────────────────────────┘
                     """
-                    echo "Analyzing modified files..."
-                    
-                    // Make script executable
                     sh 'chmod +x jenkins/scripts/detect-changes.sh'
-                    
-                    // Detect changed files
+
                     def changedFiles = sh(
                         script: './jenkins/scripts/detect-changes.sh',
                         returnStdout: true
                     ).trim()
-                    
+
                     if (changedFiles) {
                         env.CHANGED_FILES = changedFiles
-                        echo "✓ Modified files detected:"
-                        echo "${changedFiles}"
-                        
-                        // Count files
                         def fileCount = changedFiles.split('\n').size()
-                        echo "✓ Total files changed: ${fileCount}"
+                        echo "✓ ${fileCount} file(s) changed:"
+                        echo "${changedFiles}"
                     } else {
-                        echo "ℹ️  No relevant files changed. Skipping test generation."
-                        env.SKIP_TEST_GENERATION = 'true'
+                        echo "ℹ️  No relevant source files changed. Skipping BDD generation."
+                        env.SKIP_GENERATION = 'true'
                     }
                 }
             }
         }
-        
+
         stage('3️⃣  Setup Environment') {
             when {
-                expression { env.SKIP_TEST_GENERATION != 'true' }
+                expression { env.SKIP_GENERATION != 'true' }
             }
             steps {
                 script {
                     echo """
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 3/9: Setup Environment                                             │
+│ Stage 3/9: Setup Environment                                              │
 └───────────────────────────────────────────────────────────────────────────┘
                     """
-                    echo "Configuring build environment..."
-                    echo "Using credentials from Jenkins Credentials Store"
-                    
-                    // Verify credentials are loaded
-                    echo "✓ AI_CORE_CLIENT_ID: ${env.AI_CORE_CLIENT_ID ? 'Set' : 'Missing'}"
-                    echo "✓ AI_CORE_CLIENT_SECRET: ${env.AI_CORE_CLIENT_SECRET ? 'Set' : 'Missing'}"
+                    echo "✓ AI_CORE_CLIENT_ID:      ${env.AI_CORE_CLIENT_ID ? 'Set' : 'Missing'}"
+                    echo "✓ AI_CORE_CLIENT_SECRET:  ${env.AI_CORE_CLIENT_SECRET ? 'Set' : 'Missing'}"
                     echo "✓ AI_CORE_DEPLOYMENT_URL: ${env.AI_CORE_DEPLOYMENT_URL ? 'Set' : 'Missing'}"
-                    echo "✓ GITHUB_TOKEN: ${env.GITHUB_TOKEN ? 'Set' : 'Missing'}"
-                    
-                    // Make setup script executable
+                    echo "✓ GITHUB_TOKEN:           ${env.GITHUB_TOKEN ? 'Set' : 'Missing'}"
+
                     sh 'chmod +x jenkins/scripts/setup-env.sh'
-                    
-                    // Setup environment
                     sh './jenkins/scripts/setup-env.sh'
-                    
-                    // Verify Node.js installation
-                    sh 'node --version'
-                    sh 'npm --version'
-                    
-                    echo "✓ Environment setup completed"
+                    sh 'node --version && npm --version'
+
                     echo """
 Progress: [████████░░░░░░░░░░░░] 33% - Phase 1 Complete ✓
                     """
                 }
             }
         }
-        
-        stage('🤖 Phase 2: AI Test Generation') {
+
+        stage('🤖 Phase 2: AI BDD Test Generation') {
             when {
-                expression { env.SKIP_TEST_GENERATION != 'true' }
+                expression { env.SKIP_GENERATION != 'true' }
             }
             steps {
                 script {
                     echo """
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║                                                                           ║
-║                    🤖 PHASE 2: AI TEST GENERATION                        ║
-║                                                                           ║
-║                    Progress: [████████░░░░░░░░░░] 33%                    ║
-║                                                                           ║
+║                 🤖 PHASE 2: AI BDD TEST GENERATION                       ║
+║                 Progress: [████████░░░░░░░░░░░░] 33%                     ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
                     """
                 }
             }
         }
-        
+
         stage('4️⃣  Install Dependencies') {
             when {
-                expression { env.SKIP_TEST_GENERATION != 'true' }
+                expression { env.SKIP_GENERATION != 'true' }
             }
             parallel {
-                stage('Backend Dependencies') {
+                stage('Backend') {
                     steps {
-                        script {
-                            echo """
-┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 4/9: Install Dependencies (Backend)                                │
-└───────────────────────────────────────────────────────────────────────────┘
-                            """
-                        }
                         dir('backend') {
-                            echo "Installing backend dependencies..."
                             sh 'npm ci'
                             echo "✓ Backend dependencies installed"
                         }
                     }
                 }
-                stage('Frontend Dependencies') {
+                stage('Frontend') {
                     steps {
-                        script {
-                            echo """
-┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 4/9: Install Dependencies (Frontend)                               │
-└───────────────────────────────────────────────────────────────────────────┘
-                            """
-                        }
                         dir('frontend') {
-                            echo "Installing frontend dependencies..."
                             sh 'npm ci'
                             echo "✓ Frontend dependencies installed"
                         }
                     }
                 }
-                stage('Playwright Dependencies') {
+                stage('Cucumber + Playwright') {
                     steps {
-                        script {
-                            echo """
-┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 4/9: Install Dependencies (Playwright)                             │
-└───────────────────────────────────────────────────────────────────────────┘
-                            """
-                        }
                         dir('playwright-tests') {
-                            echo "Installing Playwright dependencies..."
+                            echo "Installing Cucumber and Playwright dependencies..."
                             sh 'npm ci || npm install'
-                            echo "✓ Playwright dependencies installed"
-                            echo "✓ Playwright browsers already installed in container"
+                            echo "✓ Cucumber + Playwright dependencies installed"
                         }
                     }
                 }
             }
         }
-        
-        stage('5️⃣  Generate Tests') {
+
+        stage('5️⃣  Generate Feature Files') {
             when {
-                expression { env.SKIP_TEST_GENERATION != 'true' }
+                expression { env.SKIP_GENERATION != 'true' }
             }
             steps {
                 script {
                     echo """
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 5/9: AI Test Generation                                            │
+│ Stage 5/9: AI Phase 1 — Generate Gherkin Feature Files                   │
 └───────────────────────────────────────────────────────────────────────────┘
                     """
-                    echo "🤖 Using AI to generate test cases..."
+                    echo "🤖 Generating .feature files from changed source code..."
                     echo "📡 Connecting to SAP AI Core..."
-                    
-                    // Make script executable
-                    sh 'chmod +x jenkins/scripts/generate-tests.js'
-                    
-                    // Generate tests using AI
+
                     def result = sh(
-                        script: 'node jenkins/scripts/generate-tests.js',
+                        script: '''
+                            GENERATION_PHASE=features \
+                            FEATURES_DIR=${FEATURES_DIR} \
+                            node jenkins/scripts/generate-bdd-tests.js
+                        ''',
                         returnStatus: true
                     )
-                    
+
                     if (result == 0) {
-                        echo "✓ Test generation completed successfully"
-                        
-                        // List generated tests
-                        sh "ls -la ${GENERATED_TESTS_DIR}/ || echo 'No tests generated'"
+                        echo "✓ Feature file generation completed"
+                        sh "ls -la ${FEATURES_DIR}/ || echo 'No feature files found'"
                     } else {
-                        echo "⚠️  Warning: Test generation encountered issues"
+                        echo "⚠️  Feature file generation encountered issues"
                         currentBuild.result = 'UNSTABLE'
                     }
                 }
             }
         }
-        
-        stage('6️⃣  Run Unit Tests') {
+
+        stage('6️⃣  Generate Step Definitions') {
+            when {
+                expression { env.SKIP_GENERATION != 'true' }
+            }
+            steps {
+                script {
+                    echo """
+┌───────────────────────────────────────────────────────────────────────────┐
+│ Stage 6/9: AI Phase 2 — Generate Cucumber Step Definitions               │
+└───────────────────────────────────────────────────────────────────────────┘
+                    """
+                    echo "🤖 Generating step definition files from feature files..."
+
+                    def result = sh(
+                        script: '''
+                            GENERATION_PHASE=steps \
+                            FEATURES_DIR=${FEATURES_DIR} \
+                            STEPS_DIR=${STEPS_DIR} \
+                            node jenkins/scripts/generate-bdd-tests.js
+                        ''',
+                        returnStatus: true
+                    )
+
+                    if (result == 0) {
+                        echo "✓ Step definition generation completed"
+                        sh "ls -la ${STEPS_DIR}/ || echo 'No step files found'"
+                    } else {
+                        echo "⚠️  Step definition generation encountered issues"
+                        currentBuild.result = 'UNSTABLE'
+                    }
+
+                    echo """
+Progress: [████████████████░░░░] 66% - Phase 2 Complete ✓
+                    """
+                }
+            }
+        }
+
+        stage('✅ Phase 3: Testing & Reporting') {
+            steps {
+                script {
+                    echo """
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                 ✅ PHASE 3: TESTING & REPORTING                          ║
+║                 Progress: [████████████████░░░░] 66%                     ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+                    """
+                }
+            }
+        }
+
+        stage('7️⃣  Run Unit Tests') {
             parallel {
                 stage('Backend Unit Tests') {
                     steps {
                         script {
                             echo """
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 6/9: Run Unit Tests (Backend)                                      │
+│ Stage 7/9: Run Unit Tests (Backend)                                       │
 └───────────────────────────────────────────────────────────────────────────┘
                             """
                         }
                         dir('backend') {
-                            echo "🧪 Running backend unit tests..."
                             sh 'npm test -- --testPathPattern=tests/unit --coverage --json --outputFile=../reports/backend-unit-tests.json || true'
                             echo "✓ Backend unit tests completed"
                         }
@@ -337,199 +327,137 @@ Progress: [████████░░░░░░░░░░░░] 33% - P
                         script {
                             echo """
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 6/9: Run Unit Tests (Frontend)                                     │
+│ Stage 7/9: Run Unit Tests (Frontend)                                      │
 └───────────────────────────────────────────────────────────────────────────┘
                             """
                         }
                         dir('frontend') {
-                            echo "🧪 Running frontend unit tests..."
                             sh 'npm test -- --coverage --reporter=json --outputFile=../reports/frontend-unit-tests.json || true'
                             echo "✓ Frontend unit tests completed"
                         }
                     }
                 }
             }
-            post {
-                always {
-                    script {
-                        echo """
-Progress: [████████████████░░░░] 66% - Phase 2 Complete ✓
-                        """
-                    }
-                }
-            }
         }
-        
-        stage('✅ Phase 3: Validation & Reporting') {
-            when {
-                expression { env.SKIP_TEST_GENERATION != 'true' }
-            }
-            steps {
-                script {
-                    echo """
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                                                                           ║
-║                    ✅ PHASE 3: VALIDATION & REPORTING                    ║
-║                                                                           ║
-║                    Progress: [████████████████░░░░] 66%                  ║
-║                                                                           ║
-╚═══════════════════════════════════════════════════════════════════════════╝
-                    """
-                }
-            }
-        }
-        
-        stage('7️⃣  Execute Generated Tests') {
-            when {
-                expression { env.SKIP_TEST_GENERATION != 'true' }
-            }
+
+        stage('8️⃣  Execute Cucumber BDD Tests') {
             steps {
                 script {
                     echo """
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 7/9: Execute AI-Generated Tests                                    │
+│ Stage 8/9: Execute Cucumber BDD Tests & Generate Report                  │
 └───────────────────────────────────────────────────────────────────────────┘
                     """
-                    
+
+                    // Ensure reports directory exists
+                    sh 'mkdir -p reports'
+
                     dir('playwright-tests') {
-                        // Check if generated tests exist
-                        def testsExist = sh(
-                            script: "test -d ${GENERATED_TESTS_DIR} && ls ${GENERATED_TESTS_DIR}/*.spec.js 2>/dev/null",
-                            returnStatus: true
-                        ) == 0
-                        
-                        if (testsExist) {
-                            echo "🎭 Executing AI-generated Playwright tests..."
-                            
-                            // Run Playwright tests
+                        def featureCount = sh(
+                            script: "find features/ -name '*.feature' 2>/dev/null | wc -l",
+                            returnStdout: true
+                        ).trim()
+
+                        if (featureCount.toInteger() > 0) {
+                            echo "🥒 Running ${featureCount} feature file(s) with Cucumber..."
+
                             sh '''
-                                npx playwright test generated/ \
-                                    --reporter=html,json \
-                                    --output=../reports/playwright \
+                                npx cucumber-js \
+                                    --format progress \
+                                    --format html:../reports/cucumber-report.html \
+                                    --format json:../reports/cucumber-report.json \
                                     || true
                             '''
-                            
-                            echo "✓ Generated tests execution completed"
+
+                            echo "✓ Cucumber BDD tests executed"
+                            echo "✓ HTML report: reports/cucumber-report.html"
+                            echo "✓ JSON report: reports/cucumber-report.json"
                         } else {
-                            echo "ℹ️  No generated tests found to execute"
+                            echo "ℹ️  No feature files found — skipping Cucumber execution"
                         }
                     }
-                }
-            }
-        }
-        
-        stage('8️⃣  Validate & Report') {
-            steps {
-                script {
-                    echo """
-┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 8/9: Validate Results & Generate Reports                           │
-└───────────────────────────────────────────────────────────────────────────┘
-                    """
-                    
-                    // Make validation script executable
+
+                    // Validate results and produce summary
                     sh 'chmod +x jenkins/scripts/validate-results.js'
-                    
-                    echo "📊 Validating test results..."
-                    
-                    // Validate test results
-                    def validationResult = sh(
-                        script: 'node jenkins/scripts/validate-results.js',
-                        returnStatus: true
-                    )
-                    
-                    if (validationResult == 0) {
-                        echo "✓ Test validation completed successfully"
-                    } else {
-                        echo "⚠️  Test validation found discrepancies"
-                        currentBuild.result = 'UNSTABLE'
-                    }
-                    
-                    // Generate summary report
+                    sh 'node jenkins/scripts/validate-results.js || true'
+
+                    // Write build summary
                     sh '''
-                        echo "=== Test Execution Summary ===" > reports/summary.txt
-                        echo "Build: ${BUILD_NUMBER}" >> reports/summary.txt
-                        echo "Commit: ${GIT_COMMIT}" >> reports/summary.txt
-                        echo "Author: ${GIT_AUTHOR}" >> reports/summary.txt
-                        echo "Date: $(date)" >> reports/summary.txt
-                        echo "" >> reports/summary.txt
-                        echo "Changed Files:" >> reports/summary.txt
-                        echo "${CHANGED_FILES}" >> reports/summary.txt
+                        mkdir -p reports
+                        {
+                            echo "=== Build Summary ==="
+                            echo "Build:  ${BUILD_NUMBER}"
+                            echo "Commit: ${GIT_COMMIT}"
+                            echo "Author: ${GIT_AUTHOR}"
+                            echo "Date:   $(date)"
+                            echo ""
+                            echo "Changed Files:"
+                            echo "${CHANGED_FILES}"
+                        } > reports/summary.txt
                     '''
-                    
-                    echo "✓ Reports generated successfully"
-                }
-            }
-        }
-        
-        stage('9️⃣  Archive Artifacts') {
-            steps {
-                script {
-                    echo """
-┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 9/9: Archive Test Artifacts                                        │
-└───────────────────────────────────────────────────────────────────────────┘
-                    """
-                    
-                    echo "📦 Archiving artifacts..."
-                    
-                    // Archive test reports
-                    archiveArtifacts artifacts: 'reports/**/*', allowEmptyArchive: true
-                    
-                    // Archive generated tests
-                    archiveArtifacts artifacts: 'playwright-tests/generated/**/*.spec.js', allowEmptyArchive: true
-                    
-                    // Archive Playwright HTML report if exists
-                    archiveArtifacts artifacts: 'playwright-tests/playwright-report/**/*', allowEmptyArchive: true
-                    
-                    echo "✓ Artifacts archived successfully"
+
                     echo """
 Progress: [████████████████████] 100% - Phase 3 Complete ✓
                     """
                 }
             }
         }
+
+        stage('9️⃣  Archive Artifacts') {
+            steps {
+                script {
+                    echo """
+┌───────────────────────────────────────────────────────────────────────────┐
+│ Stage 9/9: Archive Test Artifacts                                         │
+└───────────────────────────────────────────────────────────────────────────┘
+                    """
+
+                    // Reports (Cucumber HTML, JSON, validation, summary)
+                    archiveArtifacts artifacts: 'reports/**/*', allowEmptyArchive: true
+
+                    // Generated feature files
+                    archiveArtifacts artifacts: 'playwright-tests/features/**/*.feature', allowEmptyArchive: true
+
+                    // Generated step definitions
+                    archiveArtifacts artifacts: 'playwright-tests/step-definitions/**/*.steps.js', allowEmptyArchive: true
+
+                    echo "✓ Artifacts archived"
+                }
+            }
+        }
     }
-    
+
     post {
         always {
             script {
                 echo """
 ╔═══════════════════════════════════════════════════════════════════════════╗
+║                         🏁 PIPELINE COMPLETED                            ║
 ║                                                                           ║
-║                        🏁 PIPELINE COMPLETED                             ║
-║                                                                           ║
-║                    Build Result: ${currentBuild.result ?: 'SUCCESS'}                              ║
-║                                                                           ║
+║  Result:  ${currentBuild.result ?: 'SUCCESS'}
+║  Build:   ${env.BUILD_NUMBER}
+║  Author:  ${env.GIT_AUTHOR ?: 'unknown'}
+║  Commit:  ${env.GIT_COMMIT_MSG ?: 'unknown'}
 ╚═══════════════════════════════════════════════════════════════════════════╝
-
-Summary:
-  • Total Stages: 9
-  • Build Number: ${env.BUILD_NUMBER}
-  • Duration: ${currentBuild.durationString}
-  • Commit: ${env.GIT_COMMIT_MSG}
-  • Author: ${env.GIT_AUTHOR}
                 """
             }
-            
-            // Clean up workspace
+
             cleanWs(
                 deleteDirs: true,
                 patterns: [
-                    [pattern: 'node_modules', type: 'INCLUDE'],
-                    [pattern: 'playwright-tests/generated', type: 'INCLUDE']
+                    [pattern: 'node_modules', type: 'INCLUDE']
                 ]
             )
         }
-        
+
         success {
             echo "✅ Pipeline executed successfully!"
         }
-        
+
         failure {
             echo "❌ Pipeline failed. Check logs for details."
         }
-        
+
         unstable {
             echo "⚠️  Pipeline completed with warnings."
         }

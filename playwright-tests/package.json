@@ -1,25 +1,25 @@
 {
   "name": "automator-playwright-tests",
   "version": "1.0.0",
-  "description": "AI-generated Playwright tests for Order Management application",
+  "description": "AI-driven BDD test automation for Order Management application",
+  "type": "module",
   "scripts": {
-    "test": "playwright test",
-    "test:ui": "playwright test --project=chromium-ui",
-    "test:api": "playwright test --project=api",
-    "test:debug": "playwright test --debug",
-    "test:headed": "playwright test --headed",
-    "report": "playwright show-report",
+    "test:bdd": "cucumber-js",
+    "test:bdd:dry": "cucumber-js --dry-run",
+    "test:bdd:tags": "cucumber-js --tags",
     "install:browsers": "playwright install --with-deps chromium"
   },
   "keywords": [
+    "cucumber",
+    "bdd",
     "playwright",
-    "testing",
     "ai-generated",
     "automation"
   ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@cucumber/cucumber": "^10.0.0",
     "@playwright/test": "^1.40.0"
   }
 }
