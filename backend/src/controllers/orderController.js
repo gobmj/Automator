@@ -185,6 +185,40 @@ export const searchOrders = async (req, res, next) => {
 };
 
 /**
+ * Bulk update order statuses
+ * PUT /api/orders/bulk/status
+ */
+export const bulkUpdateStatus = async (req, res, next) => {
+  try {
+    const { orderIds, status } = req.body;
+
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'orderIds must be a non-empty array',
+      });
+    }
+
+    const validStatuses = ['CREATED', 'RELEASABLE', 'RELEASED', 'IN_PROGRESS', 'COMPLETED'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+      });
+    }
+
+    const result = await orderService.bulkUpdateStatus(orderIds, status);
+    res.status(200).json({
+      success: true,
+      message: `Bulk status update completed. Updated: ${result.updated.length}, Failed: ${result.failed.length}`,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Get order statistics
  * GET /api/orders/statistics
  */
