@@ -138,20 +138,40 @@ async function generateTestWithAI(fileAnalysis, config, accessToken, retries = 3
 // Make AI request
 function makeAIRequest(prompt, config, accessToken) {
     return new Promise((resolve, reject) => {
-        const requestData = JSON.stringify({
-            messages: [
-                {
-                    role: 'system',
-                    content: 'You are an expert test automation engineer. Generate comprehensive Playwright test cases for the provided code. Return only valid JavaScript code for Playwright tests, no explanations.'
-                },
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ],
-            max_tokens: 2000,
-            temperature: 0.3
-        });
+        // Detect if using Anthropic model based on deployment URL
+        const isAnthropic = config.deploymentUrl.includes('anthropic') || config.deploymentUrl.includes('claude');
+        
+        let requestData;
+        if (isAnthropic) {
+            // Anthropic Claude API format
+            requestData = JSON.stringify({
+                anthropic_version: "2023-06-01",
+                messages: [
+                    {
+                        role: 'user',
+                        content: `You are an expert test automation engineer. Generate comprehensive Playwright test cases for the provided code. Return only valid JavaScript code for Playwright tests, no explanations.\n\n${prompt}`
+                    }
+                ],
+                max_tokens: 2000,
+                temperature: 0.3
+            });
+        } else {
+            // OpenAI API format
+            requestData = JSON.stringify({
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are an expert test automation engineer. Generate comprehensive Playwright test cases for the provided code. Return only valid JavaScript code for Playwright tests, no explanations.'
+                    },
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                max_tokens: 2000,
+                temperature: 0.3
+            });
+        }
         
         const url = new URL(config.deploymentUrl);
         const options = {
@@ -279,9 +299,16 @@ function extractTestCode(response) {
     // Handle different response formats from AI Core
     let content = '';
     
-    if (response.choices && response.choices[0]) {
+    // Anthropic Claude format
+    if (response.content && Array.isArray(response.content)) {
+        content = response.content.map(item => item.text || '').join('');
+    }
+    // OpenAI format
+    else if (response.choices && response.choices[0]) {
         content = response.choices[0].message?.content || response.choices[0].text || '';
-    } else if (response.content) {
+    } 
+    // Generic formats
+    else if (response.content) {
         content = response.content;
     } else if (response.text) {
         content = response.text;
