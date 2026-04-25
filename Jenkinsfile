@@ -154,7 +154,7 @@ pipeline {
                         dir('playwright-tests') {
                             echo "Installing Playwright dependencies..."
                             sh 'npm ci || npm install'
-                            sh 'npx playwright install --with-deps chromium'
+                            echo "Playwright browsers already installed in container"
                         }
                     }
                 }
