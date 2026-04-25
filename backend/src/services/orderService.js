@@ -5,7 +5,7 @@ import { Op } from 'sequelize';
 /**
  * Order Service
  * Handles business logic for order management
- * Final test: AI-powered test generation with Anthropic Claude API
+ * Testing with OpenAI-compatible SAP AI Core wrapper
  */
 
 /**
