@@ -6,6 +6,7 @@ import { Op } from 'sequelize';
  * Order Service
  * Handles business logic for order management
  * Testing with OpenAI-compatible SAP AI Core wrapper
+ * Testing pipeline visual roadmap - AI test generation demo
  */
 
 /**
