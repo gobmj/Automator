@@ -4,7 +4,8 @@ import { Op } from 'sequelize';
 
 /**
  * Order Service
- * Contains business logic for order operations
+ * Handles business logic for order management
+ * Updated to trigger AI test generation
  */
 
 /**

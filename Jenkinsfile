@@ -206,7 +206,7 @@ pipeline {
                     steps {
                         dir('frontend') {
                             echo "Running frontend unit tests..."
-                            sh 'npm test -- --coverage --json --outputFile=../reports/frontend-unit-tests.json || true'
+                            sh 'npm test -- --coverage --reporter=json --outputFile=../reports/frontend-unit-tests.json || true'
                         }
                     }
                 }
@@ -295,25 +295,8 @@ pipeline {
                     // Archive generated tests
                     archiveArtifacts artifacts: 'playwright-tests/generated/**/*.spec.js', allowEmptyArchive: true
                     
-                    // Publish HTML reports
-                    publishHTML([
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'reports',
-                        reportFiles: 'summary.txt',
-                        reportName: 'Test Summary'
-                    ])
-                    
-                    // Publish Playwright HTML report if exists
-                    publishHTML([
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'playwright-tests/playwright-report',
-                        reportFiles: 'index.html',
-                        reportName: 'Playwright Test Report'
-                    ])
+                    // Archive Playwright HTML report if exists
+                    archiveArtifacts artifacts: 'playwright-tests/playwright-report/**/*', allowEmptyArchive: true
                     
                     echo "Artifacts archived successfully"
                 }
