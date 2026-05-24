@@ -17,6 +17,10 @@ pipeline {
         // GitHub configuration
         GITHUB_REPO = 'gobmj/Automator'
 
+        // Test repository — stores all generated feature and step files
+        TEST_REPO = 'gobmj/Automator_Tests'
+        TEST_REPO_DIR = 'test-repo'
+
         // Directories
         FEATURES_DIR = 'playwright-tests/features'
         STEPS_DIR = 'playwright-tests/step-definitions'
@@ -34,6 +38,14 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 30, unit: 'MINUTES')
         timestamps()
+    }
+
+    parameters {
+        booleanParam(
+            name: 'INITIAL_SETUP',
+            defaultValue: true,
+            description: 'Bootstrap mode: generate BDD tests for ALL source files and populate the test repository from scratch'
+        )
     }
 
     stages {
@@ -116,6 +128,32 @@ Total Stages: 9 | Estimated Duration: 8-15 minutes
             }
         }
 
+        stage('📦 Clone Test Repository') {
+            steps {
+                script {
+                    echo """
+┌───────────────────────────────────────────────────────────────────────────┐
+│ Clone Test Repository: ${TEST_REPO}                      │
+└───────────────────────────────────────────────────────────────────────────┘
+                    """
+                    sh """
+                        git clone https://${GITHUB_TOKEN}@github.com/${TEST_REPO}.git ${TEST_REPO_DIR} \
+                            || { echo 'Clone failed — ensure ${TEST_REPO} exists and GITHUB_TOKEN has write access'; exit 1; }
+                    """
+
+                    // Seed playwright-tests/ with existing test files so the AI
+                    // generator can read them as context for incremental updates.
+                    sh """
+                        mkdir -p ${FEATURES_DIR} ${STEPS_DIR}
+                        cp -r ${TEST_REPO_DIR}/features/. ${FEATURES_DIR}/ 2>/dev/null || true
+                        cp -r ${TEST_REPO_DIR}/step-definitions/. ${STEPS_DIR}/ 2>/dev/null || true
+                    """
+
+                    echo "✓ Test repository cloned and existing files seeded into workspace"
+                }
+            }
+        }
+
         stage('2️⃣  Detect Changes') {
             steps {
                 script {
@@ -126,15 +164,26 @@ Total Stages: 9 | Estimated Duration: 8-15 minutes
                     """
                     sh 'chmod +x jenkins/scripts/detect-changes.sh'
 
-                    def changedFiles = sh(
-                        script: './jenkins/scripts/detect-changes.sh',
-                        returnStdout: true
-                    ).trim()
+                    def changedFiles
+
+                    if (params.INITIAL_SETUP) {
+                        echo "ℹ️  INITIAL_SETUP mode — scanning all source files instead of diffing"
+                        sh 'chmod +x jenkins/scripts/list-all-source-files.sh'
+                        changedFiles = sh(
+                            script: './jenkins/scripts/list-all-source-files.sh',
+                            returnStdout: true
+                        ).trim()
+                    } else {
+                        changedFiles = sh(
+                            script: './jenkins/scripts/detect-changes.sh',
+                            returnStdout: true
+                        ).trim()
+                    }
 
                     if (changedFiles) {
                         env.CHANGED_FILES = changedFiles
                         def fileCount = changedFiles.split('\n').size()
-                        echo "✓ ${fileCount} file(s) changed:"
+                        echo "✓ ${fileCount} file(s) to process:"
                         echo "${changedFiles}"
                     } else {
                         echo "ℹ️  No relevant source files changed. Skipping BDD generation."
@@ -418,25 +467,27 @@ Progress: [████████████████████] 100% - 
             }
         }
 
-        stage('9️⃣  Archive Artifacts') {
+        stage('9️⃣  Publish Tests & Archive Reports') {
             steps {
                 script {
                     echo """
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ Stage 9/9: Archive Test Artifacts                                         │
+│ Stage 9/9: Push Tests to Repository & Archive Reports                    │
 └───────────────────────────────────────────────────────────────────────────┘
                     """
 
-                    // Reports (Cucumber HTML, JSON, validation, summary)
+                    if (env.SKIP_GENERATION != 'true') {
+                        sh 'chmod +x jenkins/scripts/push-tests-to-repo.sh'
+                        sh './jenkins/scripts/push-tests-to-repo.sh'
+                        echo "✓ Test files committed and pushed to ${TEST_REPO}"
+                    } else {
+                        echo "ℹ️  No generation ran — skipping test repository push"
+                    }
+
+                    // Archive only reports (test files now live in the test repo)
                     archiveArtifacts artifacts: 'reports/**/*', allowEmptyArchive: true
 
-                    // Generated feature files
-                    archiveArtifacts artifacts: 'playwright-tests/features/**/*.feature', allowEmptyArchive: true
-
-                    // Generated step definitions
-                    archiveArtifacts artifacts: 'playwright-tests/step-definitions/**/*.steps.js', allowEmptyArchive: true
-
-                    echo "✓ Artifacts archived"
+                    echo "✓ Reports archived"
                 }
             }
         }
