@@ -43,7 +43,7 @@ pipeline {
     parameters {
         booleanParam(
             name: 'INITIAL_SETUP',
-            defaultValue: true,
+            defaultValue: false,
             description: 'Bootstrap mode: generate BDD tests for ALL source files and populate the test repository from scratch'
         )
     }
