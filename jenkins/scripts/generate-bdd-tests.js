@@ -118,11 +118,23 @@ function stepFilePathFor(sourceFilePath) {
 // AI prompts
 // ---------------------------------------------------------------------------
 
-function createFeaturePrompt(fileAnalysis) {
+function createFeaturePrompt(fileAnalysis, existingContent) {
     const { filePath, testType, content, isAPI, isComponent } = fileAnalysis;
 
-    let prompt = `You are an expert BDD test engineer. Generate a Cucumber/Gherkin feature file for the following ${testType} code from ${filePath}.\n\n`;
-    prompt += `CODE TO ANALYZE:\n\`\`\`javascript\n${content}\n\`\`\`\n\n`;
+    const isUpdate = !!existingContent;
+    const action = isUpdate ? 'Update the existing Cucumber/Gherkin feature file' : 'Generate a Cucumber/Gherkin feature file';
+
+    let prompt = `You are an expert BDD test engineer. ${action} for the following ${testType} code from ${filePath}.\n\n`;
+    prompt += `SOURCE CODE:\n\`\`\`javascript\n${content}\n\`\`\`\n\n`;
+
+    if (isUpdate) {
+        prompt += `EXISTING FEATURE FILE (update this — do not rewrite from scratch):\n\`\`\`gherkin\n${existingContent.substring(0, 2000)}\n\`\`\`\n\n`;
+        prompt += `UPDATE INSTRUCTIONS:\n`;
+        prompt += `- Preserve existing scenarios that are still valid\n`;
+        prompt += `- Modify scenarios affected by the source code changes\n`;
+        prompt += `- Add new scenarios only for new functionality\n`;
+        prompt += `- Remove scenarios for functionality that no longer exists\n\n`;
+    }
 
     prompt += `REQUIREMENTS:\n`;
     prompt += `1. Write in Gherkin syntax (Feature, Scenario, Given, When, Then)\n`;
@@ -156,10 +168,21 @@ function createFeaturePrompt(fileAnalysis) {
     return prompt;
 }
 
-function createStepsPrompt(featureContent, _fileAnalysis) {
+function createStepsPrompt(featureContent, _fileAnalysis, existingStepsContent) {
+    const isUpdate = !!existingStepsContent;
+    const action = isUpdate ? 'Update the existing Cucumber step definitions' : 'Generate Cucumber step definitions';
 
-    let prompt = `You are an expert test automation engineer. Generate Cucumber step definitions for the following feature file.\n\n`;
+    let prompt = `You are an expert test automation engineer. ${action} for the following feature file.\n\n`;
     prompt += `FEATURE FILE:\n\`\`\`gherkin\n${featureContent}\n\`\`\`\n\n`;
+
+    if (isUpdate) {
+        prompt += `EXISTING STEP DEFINITIONS (update this — do not rewrite from scratch):\n\`\`\`javascript\n${existingStepsContent.substring(0, 2000)}\n\`\`\`\n\n`;
+        prompt += `UPDATE INSTRUCTIONS:\n`;
+        prompt += `- Preserve existing steps that are still referenced in the feature file\n`;
+        prompt += `- Modify steps affected by feature file changes\n`;
+        prompt += `- Add new steps only for new scenarios\n`;
+        prompt += `- Remove steps that are no longer referenced\n\n`;
+    }
 
     prompt += `REQUIREMENTS:\n`;
     prompt += `1. Use @cucumber/cucumber ESM import syntax\n`;
@@ -327,7 +350,16 @@ async function runPhaseFeatures(files, config, accessToken) {
             const fileAnalysis = analyzeFile(filePath, content);
             console.log(`  Test type: ${fileAnalysis.testType}`);
 
-            const prompt = createFeaturePrompt(fileAnalysis);
+            const featureFilePath = featureFilePathFor(filePath);
+            let existingContent = null;
+            if (fs.existsSync(featureFilePath)) {
+                existingContent = fs.readFileSync(featureFilePath, 'utf8');
+                console.log(`  Mode: update (existing feature file found)`);
+            } else {
+                console.log(`  Mode: create (no existing feature file)`);
+            }
+
+            const prompt = createFeaturePrompt(fileAnalysis, existingContent);
             const featureContent = await makeAIRequest(prompt, config, accessToken);
             saveFeatureFile(filePath, featureContent);
             success++;
@@ -360,7 +392,16 @@ async function runPhaseSteps(files, config, accessToken) {
             const sourceContent = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
             const fileAnalysis = analyzeFile(filePath, sourceContent);
 
-            const prompt = createStepsPrompt(featureContent, fileAnalysis);
+            const stepsFilePath = stepFilePathFor(filePath);
+            let existingStepsContent = null;
+            if (fs.existsSync(stepsFilePath)) {
+                existingStepsContent = fs.readFileSync(stepsFilePath, 'utf8');
+                console.log(`  Mode: update (existing step file found)`);
+            } else {
+                console.log(`  Mode: create (no existing step file)`);
+            }
+
+            const prompt = createStepsPrompt(featureContent, fileAnalysis, existingStepsContent);
             const stepsContent = await makeAIRequest(prompt, config, accessToken);
             saveStepDefinitions(filePath, stepsContent);
             success++;
