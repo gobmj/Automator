@@ -136,18 +136,12 @@ Total Stages: 9 | Estimated Duration: 8-15 minutes
 │ Clone Test Repository: ${TEST_REPO}                      │
 └───────────────────────────────────────────────────────────────────────────┘
                     """
-                    sh """
-                        git clone https://${GITHUB_TOKEN}@github.com/${TEST_REPO}.git ${TEST_REPO_DIR} \
-                            || { echo 'Clone failed — ensure ${TEST_REPO} exists and GITHUB_TOKEN has write access'; exit 1; }
-                    """
+                    sh 'rm -rf $TEST_REPO_DIR'
+                    sh 'git clone https://$GITHUB_TOKEN@github.com/$TEST_REPO.git $TEST_REPO_DIR || { echo "Clone failed — ensure $TEST_REPO exists and GITHUB_TOKEN has write access"; exit 1; }'
 
                     // Seed playwright-tests/ with existing test files so the AI
                     // generator can read them as context for incremental updates.
-                    sh """
-                        mkdir -p ${FEATURES_DIR} ${STEPS_DIR}
-                        cp -r ${TEST_REPO_DIR}/features/. ${FEATURES_DIR}/ 2>/dev/null || true
-                        cp -r ${TEST_REPO_DIR}/step-definitions/. ${STEPS_DIR}/ 2>/dev/null || true
-                    """
+                    sh 'mkdir -p $FEATURES_DIR $STEPS_DIR && cp -r $TEST_REPO_DIR/features/. $FEATURES_DIR/ 2>/dev/null || true && cp -r $TEST_REPO_DIR/step-definitions/. $STEPS_DIR/ 2>/dev/null || true'
 
                     echo "✓ Test repository cloned and existing files seeded into workspace"
                 }
@@ -511,7 +505,8 @@ Progress: [████████████████████] 100% - 
             cleanWs(
                 deleteDirs: true,
                 patterns: [
-                    [pattern: 'node_modules', type: 'INCLUDE']
+                    [pattern: 'node_modules', type: 'INCLUDE'],
+                    [pattern: 'test-repo',    type: 'INCLUDE']
                 ]
             )
         }
