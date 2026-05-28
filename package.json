@@ -1,0 +1,9 @@
+{
+  "name": "automator-ci",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root package for CI pipeline scripts",
+  "dependencies": {
+    "pdfkit": "^0.15.0"
+  }
+}
