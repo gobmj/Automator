@@ -4,6 +4,7 @@ import { Op } from 'sequelize';
 /**
  * Analytics Service
  * Provides comprehensive analytics and insights for order management
+ * Updated: Added dashboard analytics feature for production monitoring
  */
 
 /**
