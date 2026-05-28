@@ -476,6 +476,154 @@ Future versions will use URL versioning: `/api/v2/orders`
 
 ---
 
+---
+
+## Analytics
+
+### Get Dashboard Analytics
+
+#### GET /api/analytics/dashboard
+
+Retrieve comprehensive analytics and insights for order management dashboard.
+
+**Query Parameters:**
+- `startDate` (optional): Filter analytics from this date (ISO 8601 format)
+- `endDate` (optional): Filter analytics until this date (ISO 8601 format)
+
+**Example:**
+```
+GET /api/analytics/dashboard
+GET /api/analytics/dashboard?startDate=2026-05-01&endDate=2026-05-31
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "summary": {
+      "totalOrders": 150,
+      "overdueCount": 5,
+      "recentOrders": 23,
+      "averagePriority": "542.50",
+      "averageQuantity": "8.75"
+    },
+    "statusBreakdown": {
+      "CREATED": 20,
+      "RELEASABLE": 35,
+      "RELEASED": 40,
+      "IN_PROGRESS": 30,
+      "COMPLETED": 25
+    },
+    "plantPerformance": [
+      {
+        "plant": "DT6364",
+        "orderCount": 75,
+        "totalQuantity": 650,
+        "avgPriority": "520.00"
+      },
+      {
+        "plant": "DT6365",
+        "orderCount": 75,
+        "totalQuantity": 700,
+        "avgPriority": "565.00"
+      }
+    ],
+    "topMaterials": [
+      {
+        "material": "FORKLIFT-FRAME",
+        "orderCount": 45,
+        "totalQuantity": 400
+      },
+      {
+        "material": "ENGINE-BLOCK",
+        "orderCount": 30,
+        "totalQuantity": 250
+      }
+    ],
+    "priorityDistribution": [
+      {
+        "range": "Critical (1-200)",
+        "count": 15
+      },
+      {
+        "range": "High (201-400)",
+        "count": 25
+      },
+      {
+        "range": "Medium (401-600)",
+        "count": 50
+      },
+      {
+        "range": "Low (601-800)",
+        "count": 40
+      },
+      {
+        "range": "Very Low (801-1000)",
+        "count": 20
+      }
+    ],
+    "overdueOrders": [
+      {
+        "orderId": "ORD-2026-9613",
+        "orderNumber": "TEST-001",
+        "material": "FORKLIFT-FRAME",
+        "status": "IN_PROGRESS",
+        "scheduledCompletionDate": "2026-04-01T00:00:00.000Z",
+        "priority": 800,
+        "daysOverdue": 57
+      }
+    ],
+    "timeline": [
+      {
+        "date": "2026-05-01",
+        "ordersCreated": 5
+      },
+      {
+        "date": "2026-05-02",
+        "ordersCreated": 8
+      }
+    ]
+  }
+}
+```
+
+**Response Fields:**
+
+- `summary`: Overall statistics
+  - `totalOrders`: Total number of orders (filtered by date range if provided)
+  - `overdueCount`: Number of orders past their scheduled completion date
+  - `recentOrders`: Orders created in the last 7 days
+  - `averagePriority`: Average priority across all orders
+  - `averageQuantity`: Average quantity across all orders
+
+- `statusBreakdown`: Count of orders by status
+
+- `plantPerformance`: Performance metrics per plant
+  - `orderCount`: Number of orders for this plant
+  - `totalQuantity`: Sum of quantities for this plant
+  - `avgPriority`: Average priority for this plant
+
+- `topMaterials`: Top 10 most frequently ordered materials
+  - `orderCount`: Number of orders for this material
+  - `totalQuantity`: Total quantity ordered for this material
+
+- `priorityDistribution`: Distribution of orders across priority ranges
+
+- `overdueOrders`: List of up to 20 overdue orders (not completed and past scheduled completion date)
+  - `daysOverdue`: Number of days past the scheduled completion date
+
+- `timeline`: Daily order creation count for the last 30 days
+
+**Use Cases:**
+- Dashboard visualization
+- Production planning insights
+- Resource allocation decisions
+- Performance monitoring
+- Identifying bottlenecks and overdue orders
+
+---
+
 ## Support
 
 For issues or questions, please refer to the main README.md or contact the project maintainer.

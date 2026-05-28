@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { testConnection, syncDatabase } from './config/database.js';
 import orderRoutes from './routes/orderRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 // Load environment variables
@@ -31,6 +32,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/orders', orderRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
@@ -66,7 +68,8 @@ const startServer = async () => {
       console.log(`   DELETE /api/orders/:orderId           - Delete order`);
       console.log(`   POST   /api/orders/:orderId/release   - Release order`);
       console.log(`   GET    /api/orders/status/:status     - Get by status`);
-      console.log(`   GET    /api/orders/search?q=term      - Search orders\n`);
+      console.log(`   GET    /api/orders/search?q=term      - Search orders`);
+      console.log(`   GET    /api/analytics/dashboard       - Dashboard analytics\n`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
