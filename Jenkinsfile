@@ -478,10 +478,18 @@ Progress: [████████████████████] 100% - 
                         echo "ℹ️  No generation ran — skipping test repository push"
                     }
 
-                    // Archive only reports (test files now live in the test repo)
+                    // Install pdfkit at root level (CI-safe, no global state)
+                    sh 'npm install --prefix . --no-save pdfkit 2>/dev/null || npm install --prefix . pdfkit'
+                    echo "✓ pdfkit installed"
+
+                    // Generate PDF report from all collected JSON/text reports
+                    sh 'node jenkins/scripts/generate-pdf-report.js || true'
+                    echo "✓ PDF report generated: reports/test-execution-report.pdf"
+
+                    // Archive all reports including the PDF
                     archiveArtifacts artifacts: 'reports/**/*', allowEmptyArchive: true
 
-                    echo "✓ Reports archived"
+                    echo "✓ Reports archived (including PDF)"
                 }
             }
         }
