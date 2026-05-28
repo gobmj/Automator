@@ -3,6 +3,7 @@ import * as analyticsService from '../services/analyticsService.js';
 /**
  * Analytics Controller
  * Handles HTTP requests for analytics operations
+ * Provides dashboard analytics endpoint
  */
 
 /**
