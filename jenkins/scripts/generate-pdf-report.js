@@ -158,6 +158,7 @@ function miniProgressBar(doc, x, y, w, filled, total, fillColour = C.teal) {
 }
 
 function kv(doc, key, value, keyColour = C.grey, valColour = C.black, indent = MARGIN + 12) {
+    ensureSpace(doc, 18);
     const vy = doc.y;
     doc.fillColor(keyColour).font('Helvetica-Bold').fontSize(9.5)
         .text(key, indent, vy, { continued: false });
@@ -167,7 +168,30 @@ function kv(doc, key, value, keyColour = C.grey, valColour = C.black, indent = M
 }
 
 // ─── Data parsers ─────────────────────────────────────────────────────────────
-function parseUnitResults(raw) {
+function computeCoverageFromIstanbul(cm) {
+    let lt = 0, lc = 0, ft = 0, fc = 0;
+    Object.values(cm).forEach(f => {
+        if (f.s !== undefined) {
+            // Istanbul raw format: s = statement hit counts, f = function hit counts
+            const stmts = Object.values(f.s || {});
+            lt += stmts.length;
+            lc += stmts.filter(v => v > 0).length;
+            const fns = Object.values(f.f || {});
+            ft += fns.length;
+            fc += fns.filter(v => v > 0).length;
+        } else {
+            // Jest summary format with lines/functions sub-objects
+            lt += f.lines?.total    || 0;  lc += f.lines?.covered    || 0;
+            ft += f.functions?.total || 0; fc += f.functions?.covered || 0;
+        }
+    });
+    return {
+        lines:     { pct: lt > 0 ? +((lc / lt) * 100).toFixed(1) : 0 },
+        functions: { pct: ft > 0 ? +((fc / ft) * 100).toFixed(1) : 0 },
+    };
+}
+
+function parseUnitResults(raw, coverageFinalPath) {
     if (!raw) return null;
     const s = { total: 0, passed: 0, failed: 0, skipped: 0, coverage: null };
     if (raw.numTotalTests !== undefined) {
@@ -185,17 +209,11 @@ function parseUnitResults(raw) {
             })
         );
     }
-    if (raw.coverageMap || raw.coverage) {
-        const cm = raw.coverageMap || raw.coverage;
-        let lt = 0, lc = 0, ft = 0, fc = 0;
-        Object.values(cm).forEach(f => {
-            lt += f.lines?.total    || 0;  lc += f.lines?.covered    || 0;
-            ft += f.functions?.total || 0; fc += f.functions?.covered || 0;
-        });
-        s.coverage = {
-            lines:     { pct: lt > 0 ? +((lc / lt) * 100).toFixed(2) : 0 },
-            functions: { pct: ft > 0 ? +((fc / ft) * 100).toFixed(2) : 0 },
-        };
+    // Coverage may be embedded in the JSON or in a separate coverage-final.json
+    const cm = raw.coverageMap || raw.coverage
+        || (coverageFinalPath ? loadJSON(coverageFinalPath) : null);
+    if (cm) {
+        s.coverage = computeCoverageFromIstanbul(cm);
     }
     return s;
 }
@@ -377,6 +395,7 @@ function renderUnitSection(doc, label, data) {
     doc.moveDown(0.4);
 
     if (data.coverage) {
+        ensureSpace(doc, 52);
         doc.fillColor(C.grey).font('Helvetica-Bold').fontSize(9.5)
             .text('  Code Coverage', MARGIN + 12, doc.y);
         doc.moveDown(0.25);
@@ -758,8 +777,8 @@ function main() {
     const validation  = loadJSON(path.join(REPORTS_DIR, 'validation-report.json'));
     const summaryText = loadText(path.join(REPORTS_DIR, 'summary.txt'));
 
-    const backendUnit  = parseUnitResults(backendRaw);
-    const frontendUnit = parseUnitResults(frontendRaw);
+    const backendUnit  = parseUnitResults(backendRaw,  path.join('backend',  'coverage', 'coverage-final.json'));
+    const frontendUnit = parseUnitResults(frontendRaw, path.join('frontend', 'coverage', 'coverage-final.json'));
     const cucumberData = parseCucumber(cucumberRaw);
 
     const buildInfo = { build: 'N/A', commit: 'N/A', author: 'N/A', date: new Date().toISOString() };
