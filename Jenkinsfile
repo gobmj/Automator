@@ -46,6 +46,11 @@ pipeline {
             defaultValue: false,
             description: 'Bootstrap mode: generate BDD tests for ALL source files and populate the test repository from scratch'
         )
+        string(
+            name: 'APP_BASE_URL',
+            defaultValue: '',
+            description: 'Base URL of the running backend (e.g. https://xxxx.ngrok-free.app or http://host:3000). Leave blank to skip BDD tests.'
+        )
     }
 
     stages {
@@ -405,31 +410,31 @@ Progress: [████████████████░░░░] 66% - P
                             returnStdout: true
                         ).trim()
 
-                        if (featureCount.toInteger() > 0) {
-                            // Check if the backend API is reachable before running BDD tests.
-                            // Cucumber scenarios call live HTTP endpoints; without a running
-                            // backend they fail at the network level, not at the test logic.
+                        def baseUrl = params.APP_BASE_URL?.trim() ?: ''
+
+                        if (featureCount.toInteger() > 0 && baseUrl) {
+                            // Check if the backend API is reachable at the provided URL.
+                            def healthUrl = baseUrl.replaceAll('/+$', '') + '/api/orders?page=1&limit=1'
                             def apiReachable = sh(
-                                script: 'curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:3000/api/orders?page=1&limit=1 2>/dev/null || echo "000"',
+                                script: "curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 '${healthUrl}' 2>/dev/null || echo '000'",
                                 returnStdout: true
                             ).trim()
 
                             if (apiReachable.startsWith('2') || apiReachable.startsWith('3')) {
-                                echo "🥒 API available (HTTP ${apiReachable}). Running ${featureCount} feature file(s) with Cucumber..."
+                                echo "🥒 API available at ${baseUrl} (HTTP ${apiReachable}). Running ${featureCount} feature file(s) with Cucumber..."
 
-                                // npm run test:bdd resolves the local @cucumber/cucumber binary
-                                // and picks up format/path config from cucumber.js automatically
-                                sh 'npm run test:bdd || true'
+                                sh "APP_BASE_URL='${baseUrl}' npm run test:bdd || true"
 
                                 echo "✓ Cucumber BDD tests executed"
                                 echo "✓ HTML report: reports/cucumber-report.html"
                                 echo "✓ JSON report: reports/cucumber-report.json"
                             } else {
-                                echo "ℹ️  Backend API not reachable (HTTP ${apiReachable})."
-                                echo "   BDD integration tests require the application to be running."
-                                echo "   Start the backend service before executing this pipeline to run BDD tests."
+                                echo "ℹ️  Backend API not reachable at ${baseUrl} (HTTP ${apiReachable})."
                                 echo "   Skipping Cucumber execution."
                             }
+                        } else if (featureCount.toInteger() > 0 && !baseUrl) {
+                            echo "ℹ️  APP_BASE_URL not set — skipping BDD tests."
+                            echo "   Re-run the build with APP_BASE_URL set to your ngrok/local URL to execute BDD tests."
                         } else {
                             echo "ℹ️  No feature files found — skipping Cucumber execution"
                         }
