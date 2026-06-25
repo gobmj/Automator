@@ -7,6 +7,7 @@ const router = express.Router();
  * Analytics Routes
  */
 
+
 // Get dashboard analytics
 router.get('/dashboard', analyticsController.getDashboardAnalytics);
 
