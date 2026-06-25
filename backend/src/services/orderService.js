@@ -292,3 +292,16 @@ export const getOrderStatistics = async () => {
     },
   };
 };
+
+/**
+ * Update order notes
+ * @param {string} orderId - Order ID
+ * @param {string} notes - Notes to update
+ * @returns {Promise<Object>} Updated order
+ */
+export const updateOrderNotes = async (orderId, notes) => {
+  const order = await getOrderById(orderId);
+  
+  await order.update({ notes });
+  return order;
+};

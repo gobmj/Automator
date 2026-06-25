@@ -23,6 +23,9 @@ router.put('/bulk/status', orderController.bulkUpdateStatus);
 // Escalate order priority
 router.patch('/:orderId/priority', validateOrderId, orderController.escalateOrderPriority);
 
+// Update order notes
+router.patch('/:orderId/notes', validateOrderId, orderController.updateOrderNotes);
+
 // Search orders (must be before /:orderId to avoid conflict)
 router.get('/search', orderController.searchOrders);
 

@@ -60,6 +60,12 @@ export const orderService = {
     });
     return response.data;
   },
+
+  // Update order notes
+  updateOrderNotes: async (orderId, notes) => {
+    const response = await api.patch(`/orders/${orderId}/notes`, { notes });
+    return response.data;
+  },
 };
 
 export default orderService;

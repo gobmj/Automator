@@ -8,6 +8,9 @@ const OrderDetails = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [notes, setNotes] = useState('');
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
 
   useEffect(() => {
     fetchOrder();
@@ -18,12 +21,31 @@ const OrderDetails = () => {
       setLoading(true);
       const response = await orderService.getOrderById(orderId);
       setOrder(response.data);
+      setNotes(response.data.notes || '');
       setError(null);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch order');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveNotes = async () => {
+    try {
+      setSavingNotes(true);
+      await orderService.updateOrderNotes(orderId, notes);
+      setIsEditingNotes(false);
+      fetchOrder();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to update notes');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const handleCancelEditNotes = () => {
+    setNotes(order.notes || '');
+    setIsEditingNotes(false);
   };
 
   const handleRelease = async () => {
@@ -229,6 +251,74 @@ const OrderDetails = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Order Notes Card */}
+      <div className="bg-white rounded-2xl shadow-xl p-8 card-hover mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-700 to-blue-900 bg-clip-text text-transparent">
+            Order Notes
+          </h2>
+          {!isEditingNotes && (
+            <button
+              onClick={() => setIsEditingNotes(true)}
+              className="btn-secondary flex items-center space-x-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span>Edit Notes</span>
+            </button>
+          )}
+        </div>
+        
+        {isEditingNotes ? (
+          <div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              rows="6"
+              placeholder="Add notes or comments about this order..."
+            />
+            <div className="flex items-center space-x-3 mt-4">
+              <button
+                onClick={handleSaveNotes}
+                disabled={savingNotes}
+                className="btn-primary flex items-center space-x-2"
+              >
+                {savingNotes ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Save Notes</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleCancelEditNotes}
+                disabled={savingNotes}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-50 rounded-lg p-6 min-h-[120px]">
+            {notes ? (
+              <p className="text-gray-700 whitespace-pre-wrap">{notes}</p>
+            ) : (
+              <p className="text-gray-400 italic">No notes added yet. Click "Edit Notes" to add some.</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Metadata Card */}

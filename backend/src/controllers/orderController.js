@@ -273,3 +273,32 @@ export const escalateOrderPriority = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Update order notes
+ * PATCH /api/orders/:orderId/notes
+ */
+export const updateOrderNotes = async (req, res, next) => {
+  try {
+    const { notes } = req.body;
+
+    if (notes === undefined || notes === null) {
+      return res.status(400).json({
+        success: false,
+        error: 'notes field is required',
+      });
+    }
+
+    const order = await orderService.updateOrderNotes(req.params.orderId, notes);
+    res.status(200).json({
+      success: true,
+      message: 'Order notes updated successfully',
+      data: order,
+    });
+  } catch (error) {
+    if (error.message === 'Order not found') {
+      return res.status(404).json({ success: false, error: error.message });
+    }
+    next(error);
+  }
+};
