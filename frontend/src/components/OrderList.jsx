@@ -69,6 +69,16 @@ const OrderList = () => {
     return '';
   };
 
+  const getPriorityBadge = (priority) => {
+    if (priority >= 800) {
+      return { color: 'bg-red-500', label: 'HIGH' };
+    } else if (priority >= 500) {
+      return { color: 'bg-yellow-500', label: 'MEDIUM' };
+    } else {
+      return { color: 'bg-green-500', label: 'LOW' };
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -230,7 +240,12 @@ const OrderList = () => {
                     <div className="text-sm text-gray-700 font-medium">{order.orderNumber}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-600">{order.material}</div>
+                    <div className="flex items-center space-x-2">
+                      <div className="text-sm text-gray-600">{order.material}</div>
+                      <span className={`${getPriorityBadge(order.priority).color} text-white text-xs px-2 py-0.5 rounded-full font-bold`}>
+                        {getPriorityBadge(order.priority).label}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-semibold text-gray-900">{order.quantity}</div>
