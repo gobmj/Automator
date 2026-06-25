@@ -239,7 +239,7 @@ function parseCucumber(raw) {
 }
 
 // ─── Cover page ───────────────────────────────────────────────────────────────
-function renderCoverPage(doc, buildInfo, overallStatus) {
+function renderCoverPage(doc, buildInfo, overallStatus, backendUnit, frontendUnit, cucumberData) {
     doc.rect(0, 0, PAGE_W, doc.page.height).fill(C.primary);
 
     doc.fillColor(C.white).font('Helvetica-Bold').fontSize(26)
@@ -247,8 +247,13 @@ function renderCoverPage(doc, buildInfo, overallStatus) {
     doc.fillColor('#90caf9').font('Helvetica').fontSize(13)
         .text('AI-Driven BDD Test Automation Pipeline', MARGIN, 168, { align: 'center', width: CONTENT });
 
-    const bLabel = `${statusIcon(overallStatus)}  ${(overallStatus || 'UNKNOWN').toUpperCase()}`;
-    const bW = 170, bX = (PAGE_W - bW) / 2;
+    const totalPassed = (backendUnit?.passed  || 0) + (frontendUnit?.passed  || 0) + (cucumberData?.passed  || 0);
+    const totalTests  = (backendUnit?.total   || 0) + (frontendUnit?.total   || 0) + (cucumberData?.scenarios || 0);
+    const countLabel  = totalTests > 0 ? `${totalPassed}/${totalTests}` : '';
+    const statusLabel = (overallStatus || 'UNKNOWN').toUpperCase();
+    const bLabel      = countLabel ? `${countLabel}  ${statusLabel}` : statusLabel;
+
+    const bW = 200, bX = (PAGE_W - bW) / 2;
     doc.roundedRect(bX, 212, bW, 34, 7).fill(statusColour(overallStatus));
     doc.fillColor(C.white).font('Helvetica-Bold').fontSize(15)
         .text(bLabel, bX, 222, { width: bW, align: 'center' });
@@ -284,7 +289,7 @@ function renderExecutiveSummary(doc, backendUnit, frontendUnit, cucumberData, va
     const y0 = doc.y;
     doc.fillColor(C.grey).font('Helvetica-Bold').fontSize(9.5)
         .text('Overall Status', MARGIN + 12, y0);
-    badge(doc, `${statusIcon(overallStatus)}  ${overallStatus.toUpperCase()}`,
+    badge(doc, overallStatus.toUpperCase(),
           statusColour(overallStatus), MARGIN + 175, y0 - 2, 90, 17);
     doc.y = y0 + 22;
 
@@ -409,328 +414,136 @@ function renderUnitSection(doc, label, data) {
     hRule(doc);
 }
 
-// ─── BDD section — full step-level detail ────────────────────────────────────
-
-function renderBDDSummaryBand(doc, data) {
-    sectionBand(doc, '  BDD / CUCUMBER TEST RESULTS — FULL EXECUTION', C.accent);
-
-    if (!data) {
-        doc.fillColor(C.grey).font('Helvetica').fontSize(9.5)
-            .text('  No BDD execution results found. The backend API may not have been reachable when the pipeline ran.',
-                  MARGIN + 12, doc.y, { width: CONTENT - 24 });
-        doc.moveDown(0.5);
-        return;
+// ─── Parse .feature files from disk ─────────────────────────────────────────
+function parseFeatureFiles(featuresDir) {
+    const features = [];
+    if (!fs.existsSync(featuresDir)) return features;
+    const files = fs.readdirSync(featuresDir).filter(f => f.endsWith('.feature')).sort();
+    for (const file of files) {
+        const content = fs.readFileSync(path.join(featuresDir, file), 'utf8');
+        let featureName = path.basename(file, '.feature');
+        const scenarios = [];
+        for (const line of content.split('\n')) {
+            const t = line.trim();
+            if (t.startsWith('Feature:')) featureName = t.replace('Feature:', '').trim();
+            else if (t.startsWith('Scenario Outline:')) scenarios.push(t.replace('Scenario Outline:', '').trim());
+            else if (t.startsWith('Scenario:')) scenarios.push(t.replace('Scenario:', '').trim());
+        }
+        if (scenarios.length > 0) features.push({ file, featureName, scenarios });
     }
-
-    kv(doc, 'Feature files executed', data.features);
-    kv(doc, 'Total scenarios',        data.scenarios);
-    kv(doc, 'Passed',  data.passed,  C.grey, data.passed  > 0 ? C.green : C.grey);
-    kv(doc, 'Failed',  data.failed,  C.grey, data.failed  > 0 ? C.red   : C.green);
-    kv(doc, 'Pending / Undefined', data.pending, C.grey, data.pending > 0 ? C.orange : C.green);
-    kv(doc, 'Skipped', data.skipped, C.grey, C.midGrey);
-    kv(doc, 'Total duration', fmtDuration(data.durationMs));
-    kv(doc, 'Pass rate', pct(data.passed, data.scenarios));
-
-    ensureSpace(doc, 20);
-    const barY = doc.y + 2;
-    miniProgressBar(doc, MARGIN + 167, barY, 200, data.passed, data.scenarios,
-                    data.failed > 0 ? C.red : C.green);
-    doc.y = barY + 14;
-    doc.moveDown(0.4);
+    return features;
 }
 
-function renderFeatureIndex(doc, cucumberRaw) {
-    if (!Array.isArray(cucumberRaw) || !cucumberRaw.length) return;
+// ─── BDD section — scenario summary table ────────────────────────────────────
+function renderBDDSection(doc, featuresDir, cucumberRaw) {
+    sectionBand(doc, '  BDD TEST SCENARIOS', C.accent);
 
-    ensureSpace(doc, 40);
-    doc.fillColor(C.grey).font('Helvetica-Bold').fontSize(9.5)
-        .text('  Feature File Index', MARGIN + 12, doc.y);
-    doc.moveDown(0.35);
-
-    // Table header
-    const col0 = MARGIN + 12, col1 = MARGIN + 250, col2 = MARGIN + 330, col3 = MARGIN + 390, col4 = MARGIN + 450;
-    const headY = doc.y;
-    doc.rect(MARGIN, headY - 2, CONTENT, 16).fill(C.dimGrey);
-    doc.fillColor(C.primary).font('Helvetica-Bold').fontSize(8)
-        .text('Feature',   col0, headY, { continued: false })
-        .text('Scenarios', col1, headY, { continued: false })
-        .text('Passed',    col2, headY, { continued: false })
-        .text('Failed',    col3, headY, { continued: false })
-        .text('Duration',  col4, headY, { continued: false });
-    doc.y = headY + 18;
-
-    let even = false;
-    for (const feat of cucumberRaw) {
-        ensureSpace(doc, 16);
-        const scenarios = (feat.elements || []).filter(e => e.type !== 'background');
-        const fPassed  = scenarios.filter(sc => scenarioStatus(sc.steps) === 'passed').length;
-        const fFailed  = scenarios.filter(sc => scenarioStatus(sc.steps) === 'failed').length;
-        const fDurMs   = nsToMs(scenarios.reduce((a, sc) =>
-            a + (sc.steps || []).reduce((b, st) => b + (st.result?.duration || 0), 0), 0));
-        const fStatus  = fFailed > 0 ? 'failed' : fPassed === scenarios.length && scenarios.length > 0 ? 'passed' : 'pending';
-
-        const ry = doc.y;
-        if (even) doc.rect(MARGIN, ry - 2, CONTENT, 16).fill('#f5f5f5');
-        even = !even;
-
-        const name = featureName(feat);
-        badge(doc, `${statusIcon(fStatus)}`, statusColour(fStatus), col0 - 14, ry, 14, 13);
-        doc.fillColor(C.black).font('Helvetica').fontSize(8)
-            .text(name, col0 + 2, ry, { width: col1 - col0 - 10, ellipsis: true, continued: false });
-        doc.fillColor(C.grey).font('Helvetica').fontSize(8)
-            .text(String(scenarios.length), col1, ry)
-            .text(String(fPassed), col2, ry)
-            .text(fFailed > 0 ? String(fFailed) : '-', col3, ry,
-                  { fillColor: fFailed > 0 ? C.red : C.grey })
-            .text(fmtDuration(fDurMs) || '-', col4, ry);
-        doc.y = ry + 16;
-    }
-    doc.moveDown(0.6);
-    hRule(doc);
-}
-
-function renderStepError(doc, errMsg) {
-    if (!errMsg) return;
-    const lines = errMsg.split('\n').slice(0, 12);  // cap at 12 lines
-    const lineH = 11;
-    const boxH  = lines.length * lineH + 10;
-    ensureSpace(doc, boxH + 6);
-
-    const bx = MARGIN + 60;
-    const bw = CONTENT - 70;
-    doc.rect(bx, doc.y, bw, boxH).fill(C.codeBg);
-    doc.fillColor(C.codeText).font('Courier').fontSize(7.5);
-    let ty = doc.y + 5;
-    for (const line of lines) {
-        const safe = line.replace(/\t/g, '  ');
-        doc.text(safe, bx + 6, ty, { width: bw - 12, lineBreak: false, ellipsis: true });
-        ty += lineH;
-    }
-    doc.y = ty + 6;
-}
-
-function renderStepArgument(doc, arg, indent) {
-    if (!arg) return;
-    // Data table
-    if (arg.rows) {
-        const rows = arg.rows;
-        if (!rows.length) return;
-        const cols    = rows[0].cells.length;
-        const colW    = Math.floor((CONTENT - indent - MARGIN + 30) / cols);
-        const rowH    = 13;
-        ensureSpace(doc, rows.length * rowH + 6);
-        for (let ri = 0; ri < rows.length; ri++) {
-            const ry = doc.y;
-            const isHeader = ri === 0;
-            for (let ci = 0; ci < cols; ci++) {
-                const cx = MARGIN + indent + ci * colW;
-                doc.rect(cx, ry, colW - 1, rowH)
-                    .fill(isHeader ? C.dimGrey : (ri % 2 === 0 ? C.lightGrey : C.white));
-                doc.fillColor(isHeader ? C.primary : C.black)
-                    .font(isHeader ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.5)
-                    .text(String(rows[ri].cells[ci] || ''), cx + 3, ry + 3,
-                          { width: colW - 6, lineBreak: false, ellipsis: true });
+    // Build result lookup from cucumber JSON if present: "featureName::scenarioName" -> status
+    const resultMap = {};
+    if (Array.isArray(cucumberRaw) && cucumberRaw.length) {
+        for (const feat of cucumberRaw) {
+            const fName = feat.name || '';
+            for (const el of (feat.elements || [])) {
+                if (el.type === 'background') continue;
+                resultMap[`${fName}::${el.name}`] = scenarioStatus(el.steps);
             }
-            doc.y = ry + rowH;
-        }
-        doc.moveDown(0.3);
-    // DocString
-    } else if (arg.content != null) {
-        const lines = String(arg.content).split('\n').slice(0, 8);
-        const boxH  = lines.length * 10 + 8;
-        ensureSpace(doc, boxH + 4);
-        const bx = MARGIN + indent;
-        const bw = CONTENT - indent - 10;
-        doc.rect(bx, doc.y, bw, boxH).fill(C.codeBg);
-        doc.fillColor(C.codeText).font('Courier').fontSize(7);
-        let ty = doc.y + 4;
-        for (const line of lines) {
-            doc.text(line.replace(/\t/g, '  '), bx + 5, ty,
-                     { width: bw - 10, lineBreak: false, ellipsis: true });
-            ty += 10;
-        }
-        doc.y = ty + 5;
-        doc.moveDown(0.2);
-    }
-}
-
-function renderScenario(doc, sc, isBackground) {
-    const steps   = sc.steps || [];
-    const status  = isBackground ? 'background' : scenarioStatus(steps);
-    const durMs   = nsToMs(steps.reduce((a, s) => a + (s.result?.duration || 0), 0));
-    const hasFail = status === 'failed';
-
-    ensureSpace(doc, 32);
-
-    // Scenario header bar
-    const bgCol = isBackground ? C.lightGrey : statusBg(status);
-    const sy    = doc.y;
-    doc.rect(MARGIN + 8, sy, CONTENT - 8, 20).fill(bgCol);
-
-    if (!isBackground) {
-        badge(doc,
-              `${statusIcon(status)}  ${status.toUpperCase()}`,
-              statusColour(status),
-              PAGE_W - MARGIN - 76, sy + 2, 72, 16);
-    }
-
-    const kwLabel = isBackground ? 'Background' : (sc.keyword?.trim() || 'Scenario');
-    doc.fillColor(isBackground ? C.grey : C.primary)
-        .font('Helvetica-Bold').fontSize(9)
-        .text(`  ${kwLabel}: ${sc.name || ''}`,
-              MARGIN + 14, sy + 5,
-              { width: CONTENT - 100, ellipsis: true, continued: false });
-    doc.y = sy + 22;
-
-    // Tags + duration row
-    const tags = (sc.tags || []).map(t => t.name || t).filter(Boolean);
-    const metaParts = [];
-    if (tags.length)  metaParts.push(tags.join('  '));
-    if (durMs > 0)    metaParts.push(fmtDuration(durMs));
-    if (metaParts.length) {
-        doc.fillColor(C.midGrey).font('Helvetica').fontSize(7.5)
-            .text('  ' + metaParts.join('   |   '), MARGIN + 14, doc.y,
-                  { width: CONTENT - 20, continued: false });
-        doc.moveDown(0.2);
-    }
-
-    // Steps
-    for (const step of steps) {
-        const sStatus  = step.result?.status || 'skipped';
-        const sDurMs   = nsToMs(step.result?.duration);
-        const sErrMsg  = step.result?.error_message;
-        const keyword  = (step.keyword || '').trim();
-        const stepName = step.name || '';
-
-        ensureSpace(doc, 16);
-
-        const stepY = doc.y;
-        const iconCol = statusColour(sStatus);
-
-        // Status icon
-        doc.fillColor(iconCol).font('Helvetica-Bold').fontSize(9)
-            .text(statusIcon(sStatus), MARGIN + 18, stepY, { continued: false });
-
-        // Keyword (bold) + step name
-        doc.fillColor(C.accent).font('Helvetica-Bold').fontSize(9)
-            .text(keyword + ' ', MARGIN + 32, stepY, { continued: true });
-        doc.fillColor(sStatus === 'skipped' ? C.midGrey : C.black)
-            .font('Helvetica').fontSize(9)
-            .text(stepName, { continued: false, width: CONTENT - 110 });
-
-        // Duration (right-aligned on same row)
-        if (sDurMs > 0) {
-            doc.fillColor(C.midGrey).font('Helvetica').fontSize(7.5)
-                .text(fmtDuration(sDurMs), MARGIN, stepY,
-                      { align: 'right', width: CONTENT, continued: false });
-        }
-        doc.y = stepY + 13;
-
-        // Step arguments (table / docstring)
-        for (const arg of (step.arguments || [])) {
-            renderStepArgument(doc, arg, 36);
-        }
-
-        // Error block
-        if (sErrMsg) {
-            renderStepError(doc, sErrMsg);
         }
     }
+    const hasResults = Object.keys(resultMap).length > 0;
 
-    // Thin rule after scenario
-    doc.save().moveTo(MARGIN + 8, doc.y + 3)
-        .lineTo(PAGE_W - MARGIN - 8, doc.y + 3)
-        .strokeColor(hasFail ? '#ef9a9a' : C.dimGrey).lineWidth(0.4).stroke().restore();
-    doc.y += 8;
-}
+    const features = parseFeatureFiles(featuresDir);
 
-function renderFeature(doc, feat, index) {
-    const scenarios   = (feat.elements || []).filter(e => e.type !== 'background');
-    const backgrounds = (feat.elements || []).filter(e => e.type === 'background');
-    const fPassed  = scenarios.filter(sc => scenarioStatus(sc.steps) === 'passed').length;
-    const fFailed  = scenarios.filter(sc => scenarioStatus(sc.steps) === 'failed').length;
-    const fPending = scenarios.filter(sc => ['pending', 'undefined'].includes(scenarioStatus(sc.steps))).length;
-    const fDurMs   = nsToMs(scenarios.reduce((a, sc) =>
-        a + (sc.steps || []).reduce((b, st) => b + (st.result?.duration || 0), 0), 0));
-    const fStatus  = fFailed > 0 ? 'failed' : fPending > 0 ? 'pending' : fPassed === scenarios.length && scenarios.length > 0 ? 'passed' : 'pending';
-
-    ensureSpace(doc, 50);
-
-    // Feature header band
-    const fy = doc.y;
-    doc.rect(MARGIN, fy, CONTENT, 28).fill(C.primary);
-    badge(doc, `${statusIcon(fStatus)}  ${fStatus.toUpperCase()}`,
-          statusColour(fStatus), PAGE_W - MARGIN - 84, fy + 6, 80, 18);
-    doc.fillColor('#90caf9').font('Helvetica').fontSize(7.5)
-        .text(`Feature ${index}`, MARGIN + 8, fy + 4, { continued: false });
-    doc.fillColor(C.white).font('Helvetica-Bold').fontSize(10.5)
-        .text(featureName(feat), MARGIN + 8, fy + 13,
-              { width: CONTENT - 100, ellipsis: true, continued: false });
-    doc.y = fy + 32;
-
-    // Feature URI + tag line
-    const featTags = (feat.tags || []).map(t => t.name || t).filter(Boolean);
-    const metaLine = [feat.uri, featTags.join(' '), fDurMs > 0 ? fmtDuration(fDurMs) : '']
-        .filter(Boolean).join('   |   ');
-    if (metaLine) {
-        doc.fillColor(C.midGrey).font('Helvetica').fontSize(7.5)
-            .text('  ' + metaLine, MARGIN + 8, doc.y, { width: CONTENT - 16, continued: false });
-        doc.moveDown(0.25);
-    }
-
-    // Feature description
-    if (feat.description && feat.description.trim()) {
-        const descLines = feat.description.trim().split('\n').slice(0, 4);
-        doc.fillColor(C.grey).font('Helvetica').fontSize(8).italic &&
-            doc.fillColor(C.grey).font('Helvetica').fontSize(8);
-        for (const dl of descLines) {
-            ensureSpace(doc, 12);
-            doc.text('  ' + dl.trim(), MARGIN + 8, doc.y,
-                     { width: CONTENT - 16, continued: false });
-        }
-        doc.moveDown(0.2);
-    }
-
-    // Scenario stats sub-bar
-    const statY = doc.y;
-    doc.rect(MARGIN + 8, statY, CONTENT - 8, 14).fill(C.lightGrey);
-    doc.fillColor(C.grey).font('Helvetica').fontSize(7.5)
-        .text(`${scenarios.length} scenario(s)   ✓ ${fPassed} passed   ✗ ${fFailed} failed   ~ ${fPending} pending`,
-              MARGIN + 14, statY + 3, { width: CONTENT - 20, continued: false });
-    doc.y = statY + 18;
-    doc.moveDown(0.3);
-
-    // Background block (if present)
-    for (const bg of backgrounds) {
-        renderScenario(doc, bg, true);
-    }
-
-    // Scenarios
-    for (const sc of scenarios) {
-        renderScenario(doc, sc, false);
-    }
-
-    doc.moveDown(0.5);
-}
-
-function renderBDDDetailSection(doc, cucumberRaw, cucumberData) {
-    renderBDDSummaryBand(doc, cucumberData);
-
-    if (!Array.isArray(cucumberRaw) || !cucumberRaw.length) {
+    if (!features.length) {
+        doc.fillColor(C.grey).font('Helvetica').fontSize(9.5)
+            .text('  No BDD feature files found.', MARGIN + 12, doc.y, { width: CONTENT - 24 });
+        doc.moveDown(0.5);
         hRule(doc);
         return;
     }
 
-    renderFeatureIndex(doc, cucumberRaw);
+    // Count totals
+    let total = 0, passed = 0, failed = 0, notRun = 0;
+    for (const feat of features) {
+        for (const sc of feat.scenarios) {
+            total++;
+            const st = resultMap[`${feat.featureName}::${sc}`];
+            if (st === 'passed')      passed++;
+            else if (st === 'failed') failed++;
+            else                      notRun++;
+        }
+    }
 
-    // Detailed feature pages
-    sectionBand(doc, '  FEATURE FILE DETAILS', C.primary);
-    doc.moveDown(0.2);
+    // Summary stats
+    kv(doc, 'Feature files',    features.length);
+    kv(doc, 'Total scenarios',  total);
+    if (hasResults) {
+        kv(doc, 'Passed',  passed,  C.grey, passed  > 0 ? C.green  : C.grey);
+        kv(doc, 'Failed',  failed,  C.grey, failed  > 0 ? C.red    : C.green);
+        kv(doc, 'Not run', notRun,  C.grey, C.midGrey);
+        kv(doc, 'Pass rate', pct(passed, total));
+        ensureSpace(doc, 20);
+        const barY = doc.y + 2;
+        miniProgressBar(doc, MARGIN + 167, barY, 200, passed, total,
+                        failed > 0 ? C.red : C.green);
+        doc.y = barY + 14;
+    } else {
+        kv(doc, 'Execution status', 'Not run — no live backend during this build', C.grey, C.orange);
+    }
+    doc.moveDown(0.5);
 
-    cucumberRaw.forEach((feat, idx) => {
-        renderFeature(doc, feat, idx + 1);
-    });
+    // Table header
+    const C_NUM  = MARGIN + 4;
+    const C_FEAT = MARGIN + 28;
+    const C_SC   = MARGIN + 155;
+    const C_STAT = PAGE_W - MARGIN - 62;
 
+    ensureSpace(doc, 22);
+    const headY = doc.y;
+    doc.rect(MARGIN, headY - 2, CONTENT, 16).fill(C.primary);
+    doc.fillColor(C.white).font('Helvetica-Bold').fontSize(8)
+        .text('#',        C_NUM,  headY, { continued: false })
+        .text('Feature',  C_FEAT, headY, { continued: false })
+        .text('Scenario', C_SC,   headY, { continued: false })
+        .text('Status',   C_STAT, headY, { continued: false });
+    doc.y = headY + 18;
+
+    let rowNum = 0, even = false;
+    for (const feat of features) {
+        for (const sc of feat.scenarios) {
+            rowNum++;
+            ensureSpace(doc, 15);
+            const rawStatus = resultMap[`${feat.featureName}::${sc}`];
+            const status    = rawStatus || 'not_run';
+            const ry        = doc.y;
+
+            if (even) doc.rect(MARGIN, ry - 1, CONTENT, 14).fill('#f5f5f5');
+            even = !even;
+
+            doc.fillColor(C.midGrey).font('Helvetica').fontSize(7)
+                .text(String(rowNum), C_NUM, ry + 1, { width: 22, continued: false });
+
+            doc.fillColor(C.grey).font('Helvetica').fontSize(7.5)
+                .text(feat.featureName, C_FEAT, ry + 1,
+                      { width: C_SC - C_FEAT - 6, ellipsis: true, continued: false });
+
+            doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
+                .text(sc, C_SC, ry + 1,
+                      { width: C_STAT - C_SC - 8, ellipsis: true, continued: false });
+
+            const badgeLabel = status === 'not_run' ? 'NOT RUN'
+                             : status === 'passed'  ? 'PASSED'
+                             : status === 'failed'  ? 'FAILED'
+                             : status.toUpperCase();
+            const badgeCol   = status === 'not_run' ? C.midGrey : statusColour(status);
+            doc.roundedRect(C_STAT, ry, 58, 12, 2).fill(badgeCol);
+            doc.fillColor(C.white).font('Helvetica-Bold').fontSize(6.5)
+                .text(badgeLabel, C_STAT, ry + 2, { width: 58, align: 'center', continued: false });
+
+            doc.y = ry + 14;
+        }
+    }
+
+    doc.moveDown(0.5);
     hRule(doc);
 }
 
@@ -808,11 +621,13 @@ function main() {
     const out = fs.createWriteStream(OUTPUT_FILE);
     doc.pipe(out);
 
-    renderCoverPage(doc, buildInfo, overallStatus);
+    const FEATURES_DIR = process.env.FEATURES_DIR || 'playwright-tests/features';
+
+    renderCoverPage(doc, buildInfo, overallStatus, backendUnit, frontendUnit, cucumberData);
     renderExecutiveSummary(doc, backendUnit, frontendUnit, cucumberData, validation);
     renderUnitSection(doc, 'Backend', backendUnit);
     renderUnitSection(doc, 'Frontend', frontendUnit);
-    renderBDDDetailSection(doc, cucumberRaw, cucumberData);
+    renderBDDSection(doc, FEATURES_DIR, cucumberRaw);
     renderBuildInfo(doc, summaryText);
 
     // Page numbers
