@@ -282,7 +282,7 @@ function renderCoverPage(doc, buildInfo, overallStatus, backendUnit, frontendUni
 }
 
 // ─── Executive summary ────────────────────────────────────────────────────────
-function renderExecutiveSummary(doc, backendUnit, frontendUnit, cucumberData, validation) {
+function renderExecutiveSummary(doc, backendUnit, frontendUnit, validation) {
     sectionBand(doc, '  EXECUTIVE SUMMARY', C.accent);
 
     const overallStatus = validation?.summary?.overallStatus || 'unknown';
@@ -293,14 +293,12 @@ function renderExecutiveSummary(doc, backendUnit, frontendUnit, cucumberData, va
           statusColour(overallStatus), MARGIN + 175, y0 - 2, 90, 17);
     doc.y = y0 + 22;
 
-    // Stat tiles
+    // Stat tiles — backend and frontend only
     const tiles = [
-        { label: 'Backend Tests',   value: backendUnit  ? `${backendUnit.passed}/${backendUnit.total}`   : 'N/A', col: backendUnit?.failed  ? C.red : C.green },
-        { label: 'Frontend Tests',  value: frontendUnit ? `${frontendUnit.passed}/${frontendUnit.total}` : 'N/A', col: frontendUnit?.failed ? C.red : C.green },
-        { label: 'BDD Scenarios',   value: cucumberData ? `${cucumberData.passed}/${cucumberData.scenarios}` : 'N/A', col: cucumberData?.failed ? C.red : C.green },
-        { label: 'Feature Files',   value: cucumberData ? String(cucumberData.features) : 'N/A', col: C.teal },
+        { label: 'Backend Tests',  value: backendUnit  ? `${backendUnit.passed}/${backendUnit.total}`   : 'N/A', col: backendUnit?.failed  ? C.red : C.green },
+        { label: 'Frontend Tests', value: frontendUnit ? `${frontendUnit.passed}/${frontendUnit.total}` : 'N/A', col: frontendUnit?.failed ? C.red : C.green },
     ];
-    const tileW = (CONTENT - 12) / 4;
+    const tileW = (CONTENT - 12) / 2;
     let tx = MARGIN;
     for (const t of tiles) {
         ensureSpace(doc, 52);
@@ -314,13 +312,12 @@ function renderExecutiveSummary(doc, backendUnit, frontendUnit, cucumberData, va
     }
     doc.y += 54;
 
-    // Progress bars row
+    // Progress bars — backend and frontend only
     const sections = [
-        { label: 'Backend',  p: backendUnit?.passed  || 0, t: backendUnit?.total    || 0, col: C.teal },
-        { label: 'Frontend', p: frontendUnit?.passed || 0, t: frontendUnit?.total   || 0, col: C.teal },
-        { label: 'BDD',      p: cucumberData?.passed || 0, t: cucumberData?.scenarios || 0, col: cucumberData?.failed ? C.red : C.green },
+        { label: 'Backend',  p: backendUnit?.passed  || 0, t: backendUnit?.total  || 0, col: C.teal },
+        { label: 'Frontend', p: frontendUnit?.passed || 0, t: frontendUnit?.total || 0, col: C.teal },
     ];
-    const barW = (CONTENT - 12) / 3;
+    const barW = (CONTENT - 12) / 2;
     let bx = MARGIN;
     for (const sec of sections) {
         const by = doc.y;
@@ -333,11 +330,6 @@ function renderExecutiveSummary(doc, backendUnit, frontendUnit, cucumberData, va
     doc.y += 32;
     doc.moveDown(0.4);
 
-    // BDD duration if available
-    if (cucumberData?.durationMs) {
-        kv(doc, 'BDD Total Duration', fmtDuration(cucumberData.durationMs));
-    }
-
     // Discrepancies
     const disc = validation?.discrepancies || [];
     if (disc.length) {
@@ -349,9 +341,9 @@ function renderExecutiveSummary(doc, backendUnit, frontendUnit, cucumberData, va
             ensureSpace(doc, 16);
             const col = d.severity === 'high' ? C.red : C.orange;
             doc.fillColor(col).font('Helvetica-Bold').fontSize(9)
-                .text(`  ${d.severity === 'high' ? '✗' : '⚠'}  `, MARGIN + 12, doc.y, { continued: true });
+                .text(`[${(d.severity || '').toUpperCase()}] `, MARGIN + 12, doc.y, { continued: true });
             doc.fillColor(C.black).font('Helvetica').fontSize(9)
-                .text(`[${(d.severity || '').toUpperCase()}] ${d.message}`, { continued: false });
+                .text(d.message, { continued: false });
         }
     }
 
@@ -414,133 +406,80 @@ function renderUnitSection(doc, label, data) {
     hRule(doc);
 }
 
-// ─── Parse .feature files from disk ─────────────────────────────────────────
-function parseFeatureFiles(featuresDir) {
-    const features = [];
-    if (!fs.existsSync(featuresDir)) return features;
-    const files = fs.readdirSync(featuresDir).filter(f => f.endsWith('.feature')).sort();
-    for (const file of files) {
-        const content = fs.readFileSync(path.join(featuresDir, file), 'utf8');
-        let featureName = path.basename(file, '.feature');
-        const scenarios = [];
-        for (const line of content.split('\n')) {
-            const t = line.trim();
-            if (t.startsWith('Feature:')) featureName = t.replace('Feature:', '').trim();
-            else if (t.startsWith('Scenario Outline:')) scenarios.push(t.replace('Scenario Outline:', '').trim());
-            else if (t.startsWith('Scenario:')) scenarios.push(t.replace('Scenario:', '').trim());
+// ─── Unit test name listing ───────────────────────────────────────────────────
+function renderUnitTestNames(doc, label, rawJson) {
+    sectionBand(doc, `  ${label.toUpperCase()} — TEST DETAILS`, C.teal);
+
+    const tests = [];
+    if (rawJson?.testResults) {
+        for (const suite of rawJson.testResults) {
+            const suiteName = suite.testFilePath
+                ? suite.testFilePath.replace(/.*\/tests\//, '').replace(/\.test\.[jt]sx?$/, '')
+                : (suite.name || 'Unknown Suite');
+            for (const t of (suite.assertionResults || suite.tests || [])) {
+                tests.push({
+                    suite:  suiteName,
+                    name:   (t.fullName || t.title || t.name || '').replace(/^.*> /, ''),
+                    status: t.status || 'unknown',
+                });
+            }
         }
-        if (scenarios.length > 0) features.push({ file, featureName, scenarios });
-    }
-    return features;
-}
-
-// ─── BDD section — scenario summary table ────────────────────────────────────
-function renderBDDSection(doc, featuresDir, cucumberRaw) {
-    sectionBand(doc, '  BDD TEST SCENARIOS', C.accent);
-
-    // Build result lookup from cucumber JSON if present: "featureName::scenarioName" -> status
-    const resultMap = {};
-    if (Array.isArray(cucumberRaw) && cucumberRaw.length) {
-        for (const feat of cucumberRaw) {
-            const fName = feat.name || '';
-            for (const el of (feat.elements || [])) {
-                if (el.type === 'background') continue;
-                resultMap[`${fName}::${el.name}`] = scenarioStatus(el.steps);
+    } else if (Array.isArray(rawJson?.results)) {
+        // Vitest json reporter format
+        for (const suite of rawJson.results) {
+            const suiteName = (suite.name || 'Unknown Suite').replace(/.*\/tests\//, '').replace(/\.test\.[jt]sx?$/, '');
+            const flatTests = (suite.tests || []);
+            for (const t of flatTests) {
+                tests.push({ suite: suiteName, name: t.name || '', status: t.state || 'unknown' });
             }
         }
     }
-    const hasResults = Object.keys(resultMap).length > 0;
 
-    const features = parseFeatureFiles(featuresDir);
-
-    if (!features.length) {
+    if (!tests.length) {
         doc.fillColor(C.grey).font('Helvetica').fontSize(9.5)
-            .text('  No BDD feature files found.', MARGIN + 12, doc.y, { width: CONTENT - 24 });
+            .text('  No test detail available.', MARGIN + 12, doc.y, { width: CONTENT - 24 });
         doc.moveDown(0.5);
         hRule(doc);
         return;
     }
 
-    // Count totals
-    let total = 0, passed = 0, failed = 0, notRun = 0;
-    for (const feat of features) {
-        for (const sc of feat.scenarios) {
-            total++;
-            const st = resultMap[`${feat.featureName}::${sc}`];
-            if (st === 'passed')      passed++;
-            else if (st === 'failed') failed++;
-            else                      notRun++;
-        }
-    }
-
-    // Summary stats
-    kv(doc, 'Feature files',    features.length);
-    kv(doc, 'Total scenarios',  total);
-    if (hasResults) {
-        kv(doc, 'Passed',  passed,  C.grey, passed  > 0 ? C.green  : C.grey);
-        kv(doc, 'Failed',  failed,  C.grey, failed  > 0 ? C.red    : C.green);
-        kv(doc, 'Not run', notRun,  C.grey, C.midGrey);
-        kv(doc, 'Pass rate', pct(passed, total));
-        ensureSpace(doc, 20);
-        const barY = doc.y + 2;
-        miniProgressBar(doc, MARGIN + 167, barY, 200, passed, total,
-                        failed > 0 ? C.red : C.green);
-        doc.y = barY + 14;
-    } else {
-        kv(doc, 'Execution status', 'Not run — no live backend during this build', C.grey, C.orange);
-    }
-    doc.moveDown(0.5);
-
     // Table header
-    const C_NUM  = MARGIN + 4;
-    const C_FEAT = MARGIN + 28;
-    const C_SC   = MARGIN + 155;
-    const C_STAT = PAGE_W - MARGIN - 62;
+    const C_SUITE  = MARGIN + 12;
+    const C_TEST   = MARGIN + 175;
+    const C_STATUS = PAGE_W - MARGIN - 62;
 
     ensureSpace(doc, 22);
     const headY = doc.y;
-    doc.rect(MARGIN, headY - 2, CONTENT, 16).fill(C.primary);
+    doc.rect(MARGIN, headY - 2, CONTENT, 16).fill(C.teal);
     doc.fillColor(C.white).font('Helvetica-Bold').fontSize(8)
-        .text('#',        C_NUM,  headY, { continued: false })
-        .text('Feature',  C_FEAT, headY, { continued: false })
-        .text('Scenario', C_SC,   headY, { continued: false })
-        .text('Status',   C_STAT, headY, { continued: false });
+        .text('Suite / File', C_SUITE, headY, { continued: false })
+        .text('Test Name',    C_TEST,  headY, { continued: false })
+        .text('Status',       C_STATUS, headY, { continued: false });
     doc.y = headY + 18;
 
-    let rowNum = 0, even = false;
-    for (const feat of features) {
-        for (const sc of feat.scenarios) {
-            rowNum++;
-            ensureSpace(doc, 15);
-            const rawStatus = resultMap[`${feat.featureName}::${sc}`];
-            const status    = rawStatus || 'not_run';
-            const ry        = doc.y;
+    let even = false;
+    for (const t of tests) {
+        ensureSpace(doc, 14);
+        const ry = doc.y;
+        if (even) doc.rect(MARGIN, ry - 1, CONTENT, 13).fill('#f5f5f5');
+        even = !even;
 
-            if (even) doc.rect(MARGIN, ry - 1, CONTENT, 14).fill('#f5f5f5');
-            even = !even;
+        doc.fillColor(C.grey).font('Helvetica').fontSize(7.5)
+            .text(t.suite, C_SUITE, ry + 1,
+                  { width: C_TEST - C_SUITE - 6, ellipsis: true, continued: false });
 
-            doc.fillColor(C.midGrey).font('Helvetica').fontSize(7)
-                .text(String(rowNum), C_NUM, ry + 1, { width: 22, continued: false });
+        doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
+            .text(t.name, C_TEST, ry + 1,
+                  { width: C_STATUS - C_TEST - 8, ellipsis: true, continued: false });
 
-            doc.fillColor(C.grey).font('Helvetica').fontSize(7.5)
-                .text(feat.featureName, C_FEAT, ry + 1,
-                      { width: C_SC - C_FEAT - 6, ellipsis: true, continued: false });
+        const isPassed = t.status === 'passed';
+        const badgeCol = isPassed ? C.green : t.status === 'failed' ? C.red : C.midGrey;
+        const badgeLbl = isPassed ? 'PASSED' : t.status === 'failed' ? 'FAILED' : t.status.toUpperCase();
+        doc.roundedRect(C_STATUS, ry, 58, 12, 2).fill(badgeCol);
+        doc.fillColor(C.white).font('Helvetica-Bold').fontSize(6.5)
+            .text(badgeLbl, C_STATUS, ry + 2, { width: 58, align: 'center', continued: false });
 
-            doc.fillColor(C.black).font('Helvetica').fontSize(7.5)
-                .text(sc, C_SC, ry + 1,
-                      { width: C_STAT - C_SC - 8, ellipsis: true, continued: false });
-
-            const badgeLabel = status === 'not_run' ? 'NOT RUN'
-                             : status === 'passed'  ? 'PASSED'
-                             : status === 'failed'  ? 'FAILED'
-                             : status.toUpperCase();
-            const badgeCol   = status === 'not_run' ? C.midGrey : statusColour(status);
-            doc.roundedRect(C_STAT, ry, 58, 12, 2).fill(badgeCol);
-            doc.fillColor(C.white).font('Helvetica-Bold').fontSize(6.5)
-                .text(badgeLabel, C_STAT, ry + 2, { width: 58, align: 'center', continued: false });
-
-            doc.y = ry + 14;
-        }
+        doc.y = ry + 13;
     }
 
     doc.moveDown(0.5);
@@ -621,13 +560,12 @@ function main() {
     const out = fs.createWriteStream(OUTPUT_FILE);
     doc.pipe(out);
 
-    const FEATURES_DIR = process.env.FEATURES_DIR || 'playwright-tests/features';
-
     renderCoverPage(doc, buildInfo, overallStatus, backendUnit, frontendUnit, cucumberData);
-    renderExecutiveSummary(doc, backendUnit, frontendUnit, cucumberData, validation);
+    renderExecutiveSummary(doc, backendUnit, frontendUnit, validation);
     renderUnitSection(doc, 'Backend', backendUnit);
+    renderUnitTestNames(doc, 'Backend', backendRaw);
     renderUnitSection(doc, 'Frontend', frontendUnit);
-    renderBDDSection(doc, FEATURES_DIR, cucumberRaw);
+    renderUnitTestNames(doc, 'Frontend', frontendRaw);
     renderBuildInfo(doc, summaryText);
 
     // Page numbers
