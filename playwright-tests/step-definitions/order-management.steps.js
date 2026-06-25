@@ -14,7 +14,8 @@ let testOrderId;
 
 // Background Steps
 Given('the Order Management API is available at {string}', async function(url) {
-  baseURL = url;
+  // APP_BASE_URL env var (set by Jenkins/ngrok) overrides the hardcoded URL in the feature file
+  baseURL = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') + '/api' : url;
   // Initialize API context
   apiContext = await playwrightRequest.newContext({
     baseURL: baseURL,

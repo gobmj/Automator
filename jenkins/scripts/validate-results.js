@@ -29,7 +29,7 @@ function loadJSON(filePath) {
 }
 
 // Parse Jest/Vitest results
-function parseUnitTestResults(results) {
+function parseUnitTestResults(results, coverageFinalPath) {
     if (!results) return null;
 
     const summary = { total: 0, passed: 0, failed: 0, skipped: 0, coverage: null };
@@ -52,6 +52,9 @@ function parseUnitTestResults(results) {
 
     if (results.coverageMap || results.coverage) {
         summary.coverage = extractCoverage(results.coverageMap || results.coverage);
+    } else if (coverageFinalPath) {
+        const coverageFinal = loadJSON(coverageFinalPath);
+        if (coverageFinal) summary.coverage = extractCoverage(coverageFinal);
     }
 
     return summary;
@@ -66,13 +69,24 @@ function extractCoverage(coverageData) {
     };
 
     Object.values(coverageData).forEach(file => {
-        if (file.lines) {
-            coverage.lines.total += file.lines.total || 0;
-            coverage.lines.covered += file.lines.covered || 0;
-        }
-        if (file.functions) {
-            coverage.functions.total += file.functions.total || 0;
-            coverage.functions.covered += file.functions.covered || 0;
+        if (file.s !== undefined) {
+            // Istanbul raw format: s = statement hit counts, f = function hit counts
+            const stmts = Object.values(file.s || {});
+            coverage.lines.total += stmts.length;
+            coverage.lines.covered += stmts.filter(v => v > 0).length;
+            const fns = Object.values(file.f || {});
+            coverage.functions.total += fns.length;
+            coverage.functions.covered += fns.filter(v => v > 0).length;
+        } else {
+            // Jest summary format
+            if (file.lines) {
+                coverage.lines.total += file.lines.total || 0;
+                coverage.lines.covered += file.lines.covered || 0;
+            }
+            if (file.functions) {
+                coverage.functions.total += file.functions.total || 0;
+                coverage.functions.covered += file.functions.covered || 0;
+            }
         }
     });
 
@@ -254,8 +268,8 @@ function main() {
 
     fs.mkdirSync(REPORTS_DIR, { recursive: true });
 
-    const backendUnit = parseUnitTestResults(loadJSON(BACKEND_UNIT_TESTS));
-    const frontendUnit = parseUnitTestResults(loadJSON(FRONTEND_UNIT_TESTS));
+    const backendUnit = parseUnitTestResults(loadJSON(BACKEND_UNIT_TESTS),  path.join('backend',  'coverage', 'coverage-final.json'));
+    const frontendUnit = parseUnitTestResults(loadJSON(FRONTEND_UNIT_TESTS), path.join('frontend', 'coverage', 'coverage-final.json'));
     const bddTests = parseCucumberResults(loadJSON(CUCUMBER_RESULTS));
 
     const report = generateValidationReport(backendUnit, frontendUnit, bddTests);

@@ -797,7 +797,14 @@ function main() {
 
     const overallStatus = validation?.summary?.overallStatus || 'unknown';
 
-    const doc = new PDFDocument({ size: 'A4', margin: MARGIN, bufferPages: true, autoFirstPage: true });
+    // bottom: 0 prevents PDFKit auto-paginating when we intentionally draw near the page bottom
+    // (cover "Generated" text, footer). Manual page breaks are handled by ensureSpace().
+    const doc = new PDFDocument({
+        size: 'A4',
+        margins: { top: MARGIN, left: MARGIN, right: MARGIN, bottom: 0 },
+        bufferPages: true,
+        autoFirstPage: true,
+    });
     const out = fs.createWriteStream(OUTPUT_FILE);
     doc.pipe(out);
 
