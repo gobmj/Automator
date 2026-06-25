@@ -16,11 +16,12 @@ let testOrderId;
 Given('the Order Management API is available at {string}', async function(url) {
   // APP_BASE_URL env var (set by Jenkins/ngrok) overrides the hardcoded URL in the feature file
   baseURL = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') + '/api' : url;
-  // Initialize API context
+  // Initialize API context — ngrok-skip-browser-warning bypasses ngrok's interstitial HTML page
   apiContext = await playwrightRequest.newContext({
     baseURL: baseURL,
     extraHTTPHeaders: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
     }
   });
 });

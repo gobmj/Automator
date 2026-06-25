@@ -48,8 +48,8 @@ pipeline {
         )
         string(
             name: 'APP_BASE_URL',
-            defaultValue: '',
-            description: 'Base URL of the running backend (e.g. https://xxxx.ngrok-free.app or http://host:3000). Leave blank to skip BDD tests.'
+            defaultValue: 'https://5eaa-134-238-238-29.ngrok-free.app',
+            description: 'Base URL of the running backend. Update this when the ngrok URL changes.'
         )
     }
 
@@ -416,7 +416,7 @@ Progress: [████████████████░░░░] 66% - P
                             // Check if the backend API is reachable at the provided URL.
                             def healthUrl = baseUrl.replaceAll('/+$', '') + '/api/orders?page=1&limit=1'
                             def apiReachable = sh(
-                                script: "curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 '${healthUrl}' 2>/dev/null || echo '000'",
+                                script: "curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 -H 'ngrok-skip-browser-warning: true' '${healthUrl}' 2>/dev/null || echo '000'",
                                 returnStdout: true
                             ).trim()
 
