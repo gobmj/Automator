@@ -413,15 +413,16 @@ Progress: [████████████████░░░░] 66% - P
                         def baseUrl = params.APP_BASE_URL?.trim() ?: ''
 
                         if (featureCount.toInteger() > 0 && baseUrl) {
-                            // Check if the backend API is reachable at the provided URL.
-                            def healthUrl = baseUrl.replaceAll('/+$', '') + '/api/orders?page=1&limit=1'
+                            // Only skip if the server is completely unreachable (000 = connection refused).
+                            // A 4xx or 5xx still means the server is up — run the tests and let them report failures.
+                            def healthUrl = baseUrl.replaceAll('/+$', '') + '/api/orders'
                             def apiReachable = sh(
                                 script: "curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 -H 'ngrok-skip-browser-warning: true' '${healthUrl}' 2>/dev/null || echo '000'",
                                 returnStdout: true
                             ).trim()
 
-                            if (apiReachable.startsWith('2') || apiReachable.startsWith('3')) {
-                                echo "🥒 API available at ${baseUrl} (HTTP ${apiReachable}). Running ${featureCount} feature file(s) with Cucumber..."
+                            if (apiReachable != '000') {
+                                echo "🥒 API reachable at ${baseUrl} (HTTP ${apiReachable}). Running ${featureCount} feature file(s) with Cucumber..."
 
                                 sh "APP_BASE_URL='${baseUrl}' npm run test:bdd || true"
 
@@ -429,7 +430,8 @@ Progress: [████████████████░░░░] 66% - P
                                 echo "✓ HTML report: reports/cucumber-report.html"
                                 echo "✓ JSON report: reports/cucumber-report.json"
                             } else {
-                                echo "ℹ️  Backend API not reachable at ${baseUrl} (HTTP ${apiReachable})."
+                                echo "ℹ️  Backend API not reachable at ${baseUrl} (HTTP ${apiReachable}) — connection refused."
+                                echo "   Ensure the backend is running and ngrok is forwarding to port 3000."
                                 echo "   Skipping Cucumber execution."
                             }
                         } else if (featureCount.toInteger() > 0 && !baseUrl) {
