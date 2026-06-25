@@ -77,6 +77,12 @@ const Order = sequelize.define('Order', {
     field: 'scheduled_completion_date',
     comment: 'Scheduled completion date',
   },
+  notes: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    defaultValue: '',
+    comment: 'Additional notes or comments for the order',
+  },
 }, {
   tableName: 'orders',
   timestamps: true,
